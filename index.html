@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jelajah Kota Kita 💕</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ CANVAS 3D ============ -->
+  <canvas id="app-canvas"></canvas>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud">
+    <div id="route-status">🏁 Ikuti lintasan menuju FINISH...</div>
+    <div id="compass">
+      <div id="compass-needle">▲</div>
+      <div id="compass-label">U</div>
+    </div>
+    <div id="speed-hud">
+      <div id="speed-label">KECEPATAN</div>
+      <div id="speed-bar-track"><div id="speed-bar-fill"></div></div>
+    </div>
+    <button id="cam-btn" title="Ganti jarak kamera (C)">🎥 <span id="cam-btn-label">Sedang</span></button>
+  </div>
+
+  <!-- ============ D-PAD (mobile) ============ -->
+  <div id="dpad">
+    <button id="dpad-up" class="dpad-btn dpad-up">▲</button>
+    <button id="dpad-left" class="dpad-btn dpad-left">◀</button>
+    <button id="dpad-down" class="dpad-btn dpad-down">▼</button>
+    <button id="dpad-right" class="dpad-btn dpad-right">▶</button>
+  </div>
+
+  <!-- ============ LOCK SCREEN ============ -->
+  <div id="lock-screen">
+    <div id="lock-card">
+      <div class="lock-emoji">🔒💕</div>
+      <h1>Jelajah Kota Kita</h1>
+      <p id="lock-hint">Ganti hint di sini</p>
+      <input type="password" id="lock-input" placeholder="Masukkan kata sandi..." autocomplete="off">
+      <div class="lock-btn-row">
+        <button id="dodge-btn" type="button" title="Coba klik kalau bisa 😏">Maless Ahh....</button>
+        <button id="lock-submit">Buka Gerbang</button>
+      </div>
+      <p id="lock-error">Kata sandi salah, coba lagi ya 🥺</p>
+    </div>
+    <div id="lock-success-burst"></div>
+  </div>
+
+  <!-- ============ CAKE INTRO OVERLAY ============ -->
+  <div id="cake-intro">
+    <div id="cake-intro-emoji">🎂</div>
+    <div id="cake-intro-confetti"></div>
+  </div>
+
+  <!-- ============ SURAT ULANG TAHUN (POPUP SURAT LUCU) ============ -->
+  <div id="birthday-screen">
+    <div id="birthday-card">
+      <div class="birthday-envelope-flap">💌</div>
+      <div class="birthday-emoji">🎉🎂🎉</div>
+      <h1 id="birthday-title">Selamat Ulang Tahun!</h1>
+      <div id="birthday-letter-body"><!-- diisi otomatis dari BIRTHDAY_LETTER_LINES --></div>
+      <button id="birthday-close">Lanjut Jalan-jalan</button>
+    </div>
+  </div>
+
+  <!-- ============ LOADING ============ -->
+  <div id="loading-screen">
+    <div id="loading-text">Membangun kota kecil... 🏗️</div>
+  </div>
+
+  <!-- ===== Three.js r147 — build non-module (global THREE), pinned deliberately.
+       Lihat README.md "Log Keputusan Desain" untuk alasan pemilihan versi ini. ===== -->
+  <script src="https://unpkg.com/three@0.147.0/build/three.js"></script>
+  <script src="assets/photos-embedded.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
