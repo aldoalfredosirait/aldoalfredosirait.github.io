@@ -160,6 +160,46 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 7) — Kalimat balon dialog diganti 200 ucapan baru (dari daftar user) yang disesuaikan dengan data Gabriela
+Permintaan user: ganti kalimat-kalimat ucapan di balon dialog dengan
+daftar ucapan ulang tahun yang user berikan, tetapi disesuaikan dgn data:
+nama Gabriela, perempuan, beragama Kristen, ulang tahun ke-26, dan sedang
+berjuang bekerja di plosok dengan hiburan minim.
+
+**Perubahan** (SECTION 8B4, `script.js`): pendekatan kombinatorik lama
+(`GREETER_OPENERS` × `GREETER_WISHES`, lihat entri lanjutan 4) DIGANTI
+array `GREETER_MESSAGES` berisi 200 kalimat tulisan langsung.
+`getUniqueGreeterMessage(index)` dipertahankan (nama & pemanggilnya di
+`attachGreeterBubble()` tidak berubah), isinya kini cuma mengambil
+`GREETER_MESSAGES[index % length]`. Dipilih tulis-langsung karena kalimat
+dari daftar user beragam bentuk & panjangnya, tidak bisa dirakit dari
+pola pembuka × penutup tanpa terdengar kaku.
+
+**Cara menyesuaikan daftar sumber**: (1) kalimat berbau Islami
+(Barakallahu fii umrik, milad, Allah, dsb.) diubah jadi doa Kristiani
+(Tuhan Yesus, berkat, kasih karunia, Amin); (2) kalimat khusus usia 17,
+21, 30, 40, 50 diubah jadi "ke-26"/"usia 26"; (3) kalimat orang tua
+(Ayah/Ibu/kakek-nenek) & kalimat "untukku" (sudut pandang orang
+pertama) diubah jadi ditujukan ke Gabriela; (4) kalimat penyemangat
+("tahun ini tidak mudah", "kamu tidak sendirian") dikaitkan dgn kerja di
+plosok, sinyal susah, & hiburan minim; (5) kutipan tokoh dibuat
+tanpa atribusi nama di awal/akhir (kecuali yang memang bagian
+kalimat, mis. Carl Jung, Franklin, Shirley Bassey) supaya balon tetap
+ringkas & tidak memuat atribusi yang diragukan keakuratannya.
+
+**Konvensi yang tetap dijaga**: tepat 200 kalimat (= `COUNT` orang di
+`buildCityPeople`), semuanya unik, dan SETIAP kalimat memuat "Gabriela"
+atau "GbYoung" (permintaan user di entri lanjutan 4). Panjang tiap
+kalimat dijaga <= ~120 karakter supaya teks di balon tetap besar
+(mekanisme word-wrap dari entri lanjutan 6 tidak diubah). Emoji dibatasi
+ke yang umum (hindari emoji baru rilis yang bisa jadi kotak kosong di
+HP lama).
+
+**Verifikasi**: simulasi di luar browser terhadap ke-200 kalimat: 200
+unik, semuanya memuat nama, 0 balon meluber, font 24-32px (mayoritas
+26px), maksimal 5 baris. Font uji lebih lebar dari Baloo 2 sehingga di
+browser asli teks biasanya sedikit lebih besar.
+
 ### 2026-09-21 (lanjutan 6) — Teks balon dialog terpotong: diganti word-wrap multi-baris + font auto-fit lebar & tinggi
 Permintaan user: teks di balon dialog ucapan ulang tahun tidak tercover
 dengan baik oleh kotak dialognya — terpotong di tepi dan tidak terbaca.
