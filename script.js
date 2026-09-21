@@ -68,7 +68,15 @@ const CAM_PRESETS = [
   { name: "Sedang", dist: 9,  height: 4.6, look: 1.6 },
   { name: "Jauh",   dist: 13, height: 6.6, look: 2.1 },
 ];
-let camPresetIndex = 1;
+// Default preset kamera: "Sedang" (index 1) untuk desktop, tapi "Jauh"
+// (index 2) untuk perangkat sentuh murni tanpa keyboard fisik — deteksi
+// pakai `matchMedia('(pointer: coarse)')`, breakpoint yang SAMA persis
+// dipakai CSS untuk joystick analog & menyembunyikan HUD di style.css
+// (lihat komentar di sana) — permintaan user. Tombol ganti kamera sendiri
+// disembunyikan di perangkat ini (lihat style.css), tapi preset default-nya
+// tetap perlu diset benar di sini karena tombolnya memang sengaja tidak
+// bisa diklik lagi utk mengubahnya di perangkat itu.
+let camPresetIndex = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ? 2 : 1;
 const camCurrent = new THREE.Vector3();
 const camTargetCurrent = new THREE.Vector3();
 
@@ -1420,11 +1428,10 @@ function buildCityPeople() {
     if (!spot) continue;
     const person = buildPersonNPC(spot.x, spot.z);
     crowdPeople.push({ group: person, phase: Math.random() * Math.PI * 2 });
-    // Sebagian orang (1 dari 2, bukan semua 200) dijadikan "penyapa" —
-    // permintaan user: setengah dari orang-orang kota (100 dari 200) punya
-    // balon dialog ucapan ulang tahun saat mobil mendekat. Dinaikkan dari
-    // sebelumnya 1/8 (~25 orang) ke 1/2 (100 orang) sesuai permintaan.
-    if (i % 2 === 0) attachGreeterBubble(person);
+    // SEMUA orang (200/200, permintaan user dinaikkan dari sebelumnya
+    // 1/2) dijadikan "penyapa" — tiap orang di kota punya balon dialog
+    // ucapan ulang tahun sendiri saat mobil mendekat.
+    attachGreeterBubble(person);
   }
 }
 
@@ -1435,30 +1442,66 @@ function buildCityPeople() {
 // balon dialog ucapan ulang tahun (versi kalimat berbeda-beda per orang),
 // lalu balonnya hilang lagi begitu mobil menjauh.
 
-const GREETER_MESSAGES = [
-  "Selamat ulang tahun! 🎉",
-  "Happy Birthday! 🎂",
-  "Semoga panjang umur ya! 🥳",
-  "Met ultah! 🎈🎁",
-  "Wish you all the best! ✨",
-  "Semoga makin bahagia! 💖",
-  "Happy Birthday Gabriela! 🌸",
-  "Selamat bertambah usia! 🎊",
-  "Sehat & bahagia selalu! 🙏",
-  "Cheers to you! 🥂🎉",
-  "You deserve the best! 💫",
-  "Semoga semua wish-nya terkabul! 🌟",
+// Daftar kalimat ucapan DIJAMIN 200 unik & tidak ada yang sama satu sama
+// lain (permintaan user), dan SETIAP kalimat memuat nama "Gabriela" atau
+// "GbYoung" (permintaan user) — dibangun dari kombinasi 20 "pembuka"
+// (masing-masing sudah menyebut nama) × 10 "harapan penutup" (generik,
+// tanpa nama). Karena 20 × 10 = 200 tepat sama dengan jumlah orang
+// (`COUNT` di `buildCityPeople`), `getUniqueGreeterMessage(index)` di
+// bawah memetakan tiap `index` 0..199 ke SATU pasangan (pembuka, harapan)
+// yang berbeda lewat pembagian bilangan bulat — matematis dijamin tidak
+// ada dua index yang menghasilkan pasangan sama, jadi tidak perlu daftar
+// 200 kalimat ditulis manual satu-satu (rawan salah ketik/duplikat).
+const GREETER_OPENERS = [
+  "Selamat ulang tahun, Gabriela!",
+  "Happy Birthday, Gabriela!",
+  "Met ultah ya, Gabriela!",
+  "Gabriela, hari ini harimu banget!",
+  "Dear Gabriela, selamat bertambah usia!",
+  "Gabriela paling spesial hari ini!",
+  "Dear Gabriela, semoga harimu penuh senyum!",
+  "Dari kejauhan, buat Gabriela tersayang!",
+  "Dear Gabriela, met milad ya!",
+  "Gabriela, semoga hari ini istimewa banget!",
+  "Selamat ulang tahun buat GbYoung!",
+  "Happy Birthday, GbYoung!",
+  "Met ultah ya, GbYoung!",
+  "GbYoung, hari ini harimu banget!",
+  "Dear GbYoung, selamat bertambah usia!",
+  "GbYoung paling spesial hari ini!",
+  "Dear GbYoung, semoga harimu penuh senyum!",
+  "Dari kejauhan, buat GbYoung tersayang!",
+  "Dear GbYoung, met milad ya!",
+  "GbYoung, semoga hari ini istimewa banget!",
 ];
+const GREETER_WISHES = [
+  "Semoga semua impianmu terwujud. 🌟",
+  "Sehat selalu & bahagia terus ya! 💖",
+  "Semoga rejekinya lancar terus. 🍀",
+  "Tetap semangat & tersenyum ya! 😊",
+  "Panjang umur, sehat, dan sukses! 🎉",
+  "Semoga tahun ini penuh kejutan indah. 🎁",
+  "Doa terbaik selalu menyertaimu. 🙏",
+  "Semoga makin dikelilingi orang baik. 🥰",
+  "Semoga harimu secerah senyummu. ☀️",
+  "Cheers to another amazing year! 🥂",
+];
+function getUniqueGreeterMessage(index) {
+  const openerIdx = index % GREETER_OPENERS.length;
+  const wishIdx = Math.floor(index / GREETER_OPENERS.length) % GREETER_WISHES.length;
+  return `${GREETER_OPENERS[openerIdx]} ${GREETER_WISHES[wishIdx]}`;
+}
 
 const GREETER_TRIGGER_RADIUS = 9; // jarak (unit dunia) mobil ke orang supaya balonnya muncul
-let greeterMsgCounter = 0; // penghitung round-robin (bukan Math.random murni) supaya variasi kalimat benar-benar tersebar rata ke semua penyapa, bukan kebetulan sering berulang
+let greeterMsgCounter = 0; // index urut 0..199 -> dipetakan getUniqueGreeterMessage() jadi kalimat unik, lihat penjelasan di atas
 const greeterList = []; // { group, sprite, active } — dicek jaraknya ke mobil tiap frame oleh updateGreeters()
 
 // Menggambar bentuk balon percakapan (rounded-rect + ekor runcing ke
 // bawah, gaya komik) berisi satu kalimat ucapan, sebagai canvas texture.
-// Satu texture unik per orang terpilih (isi kalimatnya beda-beda) — jumlah
-// penyapa dibatasi (lihat buildCityPeople) jadi tidak menghasilkan
-// puluhan canvas besar sekaligus.
+// Satu texture unik per orang (SEMUA 200 orang kota sekarang punya
+// balonnya sendiri, lihat buildCityPeople) — tetap ringan karena tiap
+// canvas cukup kecil (512x288) dan cuma dipakai sekali saat dibangun,
+// bukan digambar ulang tiap frame.
 function makeSpeechBubbleTexture(text) {
   const W = 512, H = 288;
   const canvas = document.createElement("canvas");
@@ -1512,7 +1555,7 @@ function makeSpeechBubbleTexture(text) {
 // manual. Disembunyikan (`visible = false`) sejak awal; baru dimunculkan
 // oleh updateGreeters() berdasarkan jarak ke mobil.
 function attachGreeterBubble(personGroup) {
-  const message = GREETER_MESSAGES[greeterMsgCounter % GREETER_MESSAGES.length];
+  const message = getUniqueGreeterMessage(greeterMsgCounter);
   greeterMsgCounter++;
   const tex = makeSpeechBubbleTexture(message);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, fog: false });
@@ -2661,6 +2704,11 @@ function applyRouteLock(x, z) {
 function initChaseCam() {
   camCurrent.set(carState.x, 6, carState.z + 10);
   camTargetCurrent.set(carState.x, 1.2, carState.z);
+  // Sinkronkan label tombol kamera dengan camPresetIndex sesungguhnya
+  // (bisa "Jauh" di perangkat sentuh, bukan selalu "Sedang" seperti teks
+  // statis bawaan di index.html) — lihat komentar di deklarasi
+  // `camPresetIndex` (SECTION 1).
+  document.getElementById("cam-btn-label").textContent = CAM_PRESETS[camPresetIndex].name;
 }
 
 function updateChaseCam(dt) {

@@ -183,6 +183,22 @@ html, body {
 
 @media (pointer: coarse) {
   #joystick { display: block; }
+  /* Tampilan mobile (tanpa keyboard fisik) dibuat bersih: sembunyikan
+     tombol ganti kamera, card status rute ("Ikuti lintasan..."), kompas,
+     dan HUD kecepatan — permintaan user. Breakpoint ini SAMA persis
+     dengan yang dipakai joystick analog di atas (perangkat sentuh murni,
+     bukan lebar layar) supaya konsisten dgn definisi "mobile" yang sudah
+     ada di proyek ini. Elemen-elemen ini tetap tampil apa adanya di
+     desktop (mouse/trackpad, `pointer: fine`) — tidak diubah sama sekali.
+     Default preset kamera untuk perangkat ini juga diubah ke "Jauh" lewat
+     JS (lihat `camPresetIndex` init di SECTION 1), independen dari CSS
+     ini karena cuma CSS tidak bisa mengubah state JS. */
+  #cam-btn,
+  #route-status,
+  #compass,
+  #speed-hud {
+    display: none;
+  }
 }
 
 /* ============ LOCK SCREEN ============ */

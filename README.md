@@ -160,6 +160,64 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 5) — Tampilan mobile (tanpa keyboard) dibuat bersih: default kamera Jauh, HUD disembunyikan
+Permintaan user, khusus untuk perangkat mobile tanpa keyboard fisik
+(perangkat sentuh murni):
+
+- **Default kamera jadi "Jauh"**: `camPresetIndex` (SECTION 1) tadinya
+  selalu `1` ("Sedang") untuk semua perangkat. Sekarang di-inisialisasi
+  kondisional lewat `window.matchMedia("(pointer: coarse)")` — breakpoint
+  yang SAMA PERSIS dipakai CSS untuk memunculkan joystick analog (lihat
+  entri log "Kontrol mobile diganti... joystick analog") — jadi definisi
+  "mobile tanpa keyboard" konsisten dgn yang sudah dipakai proyek ini:
+  perangkat sentuh (`coarse`) dapat `camPresetIndex = 2` ("Jauh"),
+  perangkat mouse/trackpad (`fine`) tetap `1` ("Sedang") seperti semula.
+  `initChaseCam()` juga disesuaikan supaya label teks `#cam-btn-label`
+  di-sync ke preset yang sesungguhnya dipakai saat startup (sebelumnya
+  cuma teks statis "Sedang" di `index.html`, bisa salah tampil kalau
+  suatu saat tombolnya perlu dimunculkan lagi).
+- **HUD disembunyikan supaya tampilan bersih**: tombol ganti kamera
+  (`#cam-btn`), card status rute "Ikuti lintasan menuju FINISH..."
+  (`#route-status`), kompas (`#compass`), dan HUD kecepatan (`#speed-hud`)
+  disembunyikan (`display: none`) di `style.css`, ditaruh di dalam
+  media query `@media (pointer: coarse)` yang SAMA dipakai joystick — jadi
+  cuma hilang di perangkat sentuh, TIDAK berubah sama sekali di desktop
+  (mouse/keyboard). Karena tombol kamera ikut hilang di perangkat ini,
+  presetnya sengaja dikunci ke "Jauh" (poin di atas) sejak awal — pemain
+  di HP tidak lagi punya cara mengubahnya secara manual, jadi default-nya
+  perlu benar sejak pertama kali dibuka. `#hud` sendiri (kontainer
+  pembungkus keempatnya) tidak diapa-apakan — sudah `pointer-events: none`
+  tanpa background sejak awal, jadi aman ditinggal kosong tanpa efek
+  visual apa pun.
+
+### 2026-09-21 (lanjutan 4) — Balon dialog dinaikkan jadi SEMUA 200 orang, tiap kalimat dijamin unik & memuat nama Gabriela/GbYoung
+Permintaan lanjutan user: naikkan lagi jumlah penyapa dari 100 jadi
+**semua 200 orang** di kota, dengan syarat tambahan tiap kalimat ucapan
+HARUS berbeda-beda (tidak boleh ada yang sama) DAN harus memuat nama
+"Gabriela" atau "GbYoung" di dalamnya.
+
+`buildCityPeople()` diubah dari kondisi bersyarat (`if (i % 2 === 0)
+attachGreeterBubble(...)`) jadi tanpa syarat — `attachGreeterBubble(person)`
+dipanggil untuk SEMUA 200 orang, bukan sebagian. Daftar kalimat statis
+`GREETER_MESSAGES` (12 item, dipakai round-robin, rawan berulang kalau
+dipakai untuk 200 orang) dihapus total, diganti pendekatan kombinatorik
+yang menjamin keunikan secara matematis, bukan cuma "kebetulan tidak
+sama": `GREETER_OPENERS` (20 kalimat pembuka, MASING-MASING sudah
+menyebut nama "Gabriela" atau "GbYoung" — 10 varian per nama) ×
+`GREETER_WISHES` (10 kalimat harapan penutup generik, tanpa nama, jadi
+tidak perlu diulang di tiap opener). `getUniqueGreeterMessage(index)`
+memetakan tiap `index` 0..199 ke SATU pasangan (opener, wish) berbeda
+lewat pembagian bilangan bulat (`index % 20` untuk opener, `floor(index /
+20) % 10` untuk wish) — karena 20 × 10 = 200 tepat sama dengan jumlah
+orang, setiap pasangan dipakai TEPAT SEKALI, sehingga 200 kalimat hasil
+gabungannya dijamin semuanya berbeda tanpa perlu menulis 200 baris teks
+manual satu-satu (yang rawan salah ketik/tanpa sengaja duplikat).
+Diverifikasi lewat simulasi terpisah: dari 200 kalimat yang dihasilkan,
+200 di antaranya unik (0 duplikat) dan semuanya memuat kata "Gabriela"
+atau "GbYoung". `attachGreeterBubble()` & `updateGreeters()` (jarak
+pemicu, ukuran/posisi sprite) tidak diubah — perubahan ini murni soal
+jumlah orang & sumber kalimatnya.
+
 ### 2026-09-21 (lanjutan 3) — Balon dialog ucapan diperbesar & jumlah penyapa dinaikkan jadi 100 dari 200 orang
 Permintaan lanjutan user: balon dialog ucapan ulang tahun (fitur SECTION
 8B4 yang baru ditambahkan) diperbesar, dan jumlah orang yang jadi
