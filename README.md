@@ -160,6 +160,142 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 3) — Balon dialog ucapan diperbesar & jumlah penyapa dinaikkan jadi 100 dari 200 orang
+Permintaan lanjutan user: balon dialog ucapan ulang tahun (fitur SECTION
+8B4 yang baru ditambahkan) diperbesar, dan jumlah orang yang jadi
+"penyapa" dinaikkan dari 1/8 (~25 orang) jadi **1/2 (100 dari 200 orang
+kota)** — `buildCityPeople()` diubah dari kondisi `i % 8 === 0` jadi
+`i % 2 === 0`. Ukuran sprite balon (`attachGreeterBubble()`) dinaikkan
+dari 2.6×1.46 jadi **4.4×2.48** (rasio aspek dijaga sama persis dengan
+canvas gelembungnya, 512:288, supaya tidak gepeng/melar), dan posisi
+vertikalnya ikut dinaikkan dari lokal `y=2.55` ke `y=3.15` — perlu supaya
+ekor balon yang sekarang jauh lebih besar tetap menggantung rapi di atas
+kepala orangnya, bukan malah menembus/menimpa kepala karena baloonnya
+membesar tapi posisinya tetap sama. `GREETER_TRIGGER_RADIUS` (jarak
+mobil-ke-orang supaya balon muncul) tidak diubah — permintaan user cuma
+soal ukuran & jumlah, bukan jarak pemicunya.
+
+### 2026-09-21 (lanjutan 2) — PIN (bukan "password"), hint & title diganti, tanda tangan surat, spasi PIN↔tombol, dan balon dialog ucapan dari orang-orang random
+Enam permintaan lanjutan dari user:
+
+- **"Password" → "PIN"**: seluruh teks user-facing yang menyebut kata
+  sandi diganti jadi "PIN" — placeholder input (`Masukkan PIN...`) dan
+  pesan error (`PIN salah, coba lagi ya`) di `index.html`, plus komentar
+  konstanta `LOCK_PASSWORD` di `script.js` ("Password layar kunci" →
+  "PIN layar kunci"). Nama variabel `LOCK_PASSWORD` sendiri sengaja TIDAK
+  diganti — itu murni identifier internal, tidak pernah tampil ke user,
+  jadi mengubahnya cuma menambah risiko salah ketik tanpa manfaat apa pun.
+- **Hint diganti**: `LOCK_HINT` dari "sandi hp android kamuuu 🫵" jadi
+  "tanggal akward" sesuai permintaan user persis.
+- **Title/heading diganti**: "Jelajah Kota Kita" → "Perayaan di Dunia
+  GbYoung" di dua tempat yang memakainya sebagai judul tampilan: tag
+  `<title>` (tab browser) dan `<h1>` di layar kunci (`index.html`). Judul
+  dokumentasi di `README.md` sendiri tidak ikut diubah karena itu nama
+  proyek untuk keperluan dokumentasi teknis, bukan teks yang dilihat
+  pemain di dalam game.
+- **Tanda tangan penutup surat diganti**: baris terakhir
+  `BIRTHDAY_LETTER_LINES` dari "— Yang selalu nungguin jarak ini berakhir
+  💕" jadi **"— Aldo💕"** persis sesuai permintaan user.
+- **Jarak PIN↔tombol ditambah 30px lagi**: `margin-bottom` pada
+  `#lock-input` (`style.css`) dinaikkan dari 34px ke **64px** (34+30)
+  sesuai permintaan eksplisit "tambahkan padding 30px lagi".
+- **Balon dialog ucapan ulang tahun dari orang-orang random**: fitur baru
+  SECTION 8B4 (`GREETER_MESSAGES`, `makeSpeechBubbleTexture()`,
+  `attachGreeterBubble()`, `updateGreeters()`). Sebagian orang kota (1 dari
+  8, dipilih lewat `i % 8 === 0` di `buildCityPeople()` — total ~25 dari
+  200) masing-masing ditempeli satu **balon dialog** (`THREE.Sprite`,
+  otomatis selalu menghadap kamera, texture canvas bentuk gelembung
+  komik + ekor runcing) berisi SATU kalimat ucapan ulang tahun yang
+  BERBEDA per orang — dipilih round-robin dari daftar 12 variasi
+  `GREETER_MESSAGES` (bukan `Math.random()` murni) supaya variasinya
+  benar-benar tersebar rata ke semua penyapa, bukan kebetulan sering
+  mengulang kalimat yang sama. Balon disembunyikan (`sprite.visible =
+  false`) sejak dibuat, lalu `updateGreeters()` (dipanggil tiap frame di
+  `animate()`) mengecek jarak 2D `carState.x/z` ke posisi tiap penyapa —
+  begitu mobil masuk radius 9 unit (`GREETER_TRIGGER_RADIUS`) balonnya
+  otomatis muncul, dan begitu mobil menjauh lagi balonnya disembunyikan
+  lagi, persis alur yang diminta user. Balon dipasang sebagai child dari
+  group orangnya sendiri (posisi lokal `y = 2.55`, sedikit di atas kepala)
+  supaya otomatis ikut posisi orangnya tanpa perlu sinkronisasi manual.
+  Dibatasi 1 dari 8 orang (bukan semua 200) supaya efeknya terasa sebagai
+  "kejutan di tempat tertentu", bukan seluruh kota berteriak sekaligus,
+  sekaligus menjaga jumlah sprite tambahan tetap ringan di render.
+
+### 2026-09-21 (lanjutan) — Pesawat baliho jadi armada 10 (bukan 1) + perbaikan akar masalah "tidak terlihat", teks surat disesuaikan, hewan/orang/badut diperbanyak lagi
+Tiga permintaan lanjutan dari user setelah pembaruan sebelumnya (pesawat
+diperbesar, hewan/orang diperbanyak):
+
+- **Pesawat "tidak terlihat / seperti menetap di satu tempat" — akar
+  masalah ketemu, diperbaiki, sekalian dijadikan 10 pesawat**: pesawat
+  tunggal sebelumnya SEBENARNYA tetap mengitari radius dekat dinding
+  bebatuan tiap frame (posisinya pasti ter-update, bukan macet), tapi
+  `scene.fog` (`FogExp2`) membuatnya memudar hampir menyatu dengan warna
+  langit dari jarak ratusan unit — dari situ SEOLAH pesawatnya diam/tidak
+  kelihatan. Diperbaiki dengan menambahkan `fog: false` di SEMUA material
+  pesawat & baliho (badan, aksen sayap/ekor, baling-baling, tali, banner)
+  — bagian-bagian ini sekarang selalu dirender dengan warna & kecerahan
+  aslinya berapa pun jauhnya dari kamera, pola yang sama dengan
+  `toneMapped: false` yang sudah dipakai banner foto/HAPPY BIRTHDAY.
+  Sekalian, `buildAirplane()` dirombak jadi `buildOneAirplane()` +
+  `buildAirplanes()` (SECTION 8B2) yang membangun **10 pesawat** sekaligus
+  (`AIRPLANE_COUNT = 10`), masing-masing dapat radius orbit (0.55..0.885 ×
+  `WORLD_HALF`, masih dekat dinding bebatuan batas dunia — tetap
+  "mengitari batas bukit bebatuan" seperti permintaan awal, hanya sebagian
+  ditarik sedikit lebih dekat supaya lebih gampang terlihat), ketinggian,
+  kecepatan, arah putar (searah/berlawanan jarum jam bergantian), dan fase
+  awal berbeda-beda (`updateAirplanes()`) — supaya ke-10 pesawat tidak
+  bertabrakan satu sama lain dan gerakannya kelihatan jelas hidup, bukan
+  satu formasi kaku. Tekstur baliho ("Selamat Ulang Tahun Sayang", sesuai
+  permintaan user sebelumnya) dibuat SEKALI (`airplaneBannerTex`) lalu
+  dipakai bersama oleh ke-10 banner lewat satu `bannerMat` yang sama —
+  tidak perlu 10 canvas 2048×320 terpisah karena isinya identik.
+- **Surat: "cantik/ganteng" → "cantik" saja**: baris `BIRTHDAY_LETTER_LINES`
+  yang berbunyi "...makin cantik/ganteng..." diubah jadi "...makin
+  cantik..." sesuai permintaan user (`BIRTHDAY_PERSON_NAME` memang orang
+  spesifik, jadi kata sapaan gender-netral "cantik/ganteng" yang lama
+  memang tidak relevan lagi).
+- **Hewan, orang, & badut diperbanyak lagi**: `buildCityAnimals()` dan
+  `buildCityPeople()` masing-masing dinaikkan lagi dari `COUNT = 110` jadi
+  `COUNT = 200`, dan `buildCityClowns()` (yang sebelumnya tidak disebut
+  user, tetap 10) sekarang ikut dinaikkan ke `COUNT = 30` karena kali ini
+  disebut eksplisit. Semua tetap lewat `findClearRandomSpot()` yang sudah
+  ada, otomatis menghindari lintasan/air/bangunan — dunia (`WORLD_HALF =
+  320`) cukup luas untuk menampung total ~430 karakter tersebar tanpa
+  perlu logic baru.
+
+### 2026-09-21 — Pesawat baliho diperbesar & teksnya diganti; hewan & orang di kota diperbanyak jadi lebih ramai
+Dua permintaan user:
+
+- **Pesawat lebih besar, terbang mengitari batas bukit bebatuan, banner
+  "Selamat Ulang Tahun Sayang"**: pesawat (`buildAirplane()`, SECTION 8B2)
+  sebenarnya sejak iterasi sebelumnya SUDAH terbang melingkar di radius
+  `WORLD_HALF*0.9` (dekat dinding bebatuan batas dunia) di ketinggian jauh
+  di atas puncak tebing (~28 unit) — jadi "mengitari batas bukit bebatuan"
+  tidak perlu logic baru, cukup dipertahankan. Yang diubah: ditambahkan
+  konstanta `AIRPLANE_SCALE = 2.4` yang diterapkan sebagai `group.scale`
+  di akhir `buildAirplane()` (bukan mengubah tiap ukuran geometry bagian
+  per bagian) supaya seluruh bagian pesawat — badan, sayap, ekor, baliho,
+  tali — membesar proporsional bersamaan tanpa risiko satu bagian jadi
+  tidak sinkron dengan bagian lain. Ukuran plane baliho sendiri juga
+  dinaikkan (26×4.1 → 34×5.6) sebelum ikut discale, supaya sebanding
+  dengan badan pesawat yang sekarang jauh lebih besar. Ketinggian terbang
+  (`updateAirplane`) dinaikkan sedikit (78 → 92 unit) supaya tetap terasa
+  proporsional & jelas di atas tebing batas sekarang pesawatnya jauh lebih
+  besar dari sebelumnya. Teks baliho (`makeAirplaneBannerTexture`) diganti
+  dari "Selamat Ulang Tahun Sayangku" jadi **"Selamat Ulang Tahun Sayang"**
+  persis sesuai permintaan user — tetap lewat `shrinkFontToFit()` yang
+  sudah ada (lihat entri log banner terpotong sebelumnya) supaya teks baru
+  ini pun dijamin muat di kanvas baliho apa pun font yang akhirnya dipakai
+  browser.
+- **Hewan & orang di kota diperbanyak jadi lebih ramai**: permintaan user
+  memperbanyak isi tempat-tempat sepi di luar lintasan. `buildCityAnimals()`
+  dan `buildCityPeople()` (SECTION 8B3) sama-sama dinaikkan dari `COUNT = 45`
+  jadi `COUNT = 110` — keduanya sudah otomatis disebar lewat
+  `findClearRandomSpot()` yang menghindari lintasan/air/bangunan, jadi
+  cukup menaikkan angka `COUNT` tanpa perlu logic sebaran baru. Jumlah
+  badut (`buildCityClowns`, 10) tidak diubah karena permintaan user hanya
+  menyebut hewan & orang.
+
 ### 2026-09-21 — Kontrol mobile diganti dari D-pad (digital) jadi joystick analog
 Permintaan user: kontroler kemudi di tampilan mobile (perangkat tanpa
 keyboard fisik) diganti jadi analog. Sebelumnya kontrol sentuh berupa

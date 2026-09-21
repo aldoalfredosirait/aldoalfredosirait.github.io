@@ -9,9 +9,9 @@
 // SECTION 0 — KONFIGURASI GLOBAL
 // =====================================================================
 
-// --- Password layar kunci (GANTI di sini) ---
+// --- PIN layar kunci (GANTI di sini) ---
 const LOCK_PASSWORD = "27012026";
-const LOCK_HINT = "sandi hp android kamuuu 🫵";
+const LOCK_HINT = "tanggal akward";
 
 // --- Nama yang berulang tahun (dipakai di judul surat & baris pembuka di
 //     bawah — GANTI di sini kalau suatu saat dipakai utk orang lain) ---
@@ -22,9 +22,9 @@ const BIRTHDAY_LETTER_LINES = [
   `Happy Birthday, ${BIRTHDAY_PERSON_NAME}! 🎉`,
   "Maaf ya, cuma bisa rayain ini lewat mobil-mobilan kecil yang muter satu kota, bukan meluk kamu langsung. Jarak emang nyebelin.",
   "Tapi walau LDR-an, rasanya nggak pernah kalah jauh sama sayangnya aku ke kamu.",
-  "Semoga di sana kamu sehat terus, makin cantik/ganteng, dan makin sabar hadapin aku yang suka rewel kalau kangen. 😆",
+  "Semoga di sana kamu sehat terus, makin cantik, dan makin sabar hadapin aku yang suka rewel kalau kangen. 😆",
   "Nanti kalau udah ketemu, kita rayain lagi versi yang beneran ya — sampai saat itu, ini dulu surat dari aku, dari jauh. 💌",
-  "— Yang selalu nungguin jarak ini berakhir 💕",
+  "— Aldo💕",
 ];
 
 // --- Ukuran dunia ("sedang — seimbang") ---
@@ -1155,9 +1155,22 @@ function updateClowns(elapsed) {
   });
 }
 
-// --- Pesawat terbang menarik baliho besar ---
-let airplaneGroup = null;
+// --- Armada pesawat terbang menarik baliho besar ---
+// Diganti dari 1 pesawat jadi 10 (permintaan user) sekaligus memperbaiki
+// laporan "tidak terlihat / seperti menetap di satu tempat": akar masalah
+// SESUNGGUHNYA adalah `scene.fog` (FogExp2) — pada radius terbang yang
+// jauh (dekat dinding bebatuan, ratusan unit dari kamera), fog exponensial
+// membuat pesawat memudar hampir menyatu dengan warna langit dari
+// kebanyakan sudut pandang, jadi SEOLAH tidak bergerak/tidak kelihatan
+// padahal posisinya sebenarnya tetap ter-update tiap frame. Diperbaiki
+// dengan `fog: false` di SEMUA material pesawat & baliho di bawah — bagian
+// ini sekarang selalu dirender dengan warna & kecerahan aslinya berapa pun
+// jauhnya dari kamera, sama seperti perbaikan `toneMapped: false` yang
+// sudah dipakai banner foto/HAPPY BIRTHDAY (lihat Log Keputusan Desain).
+const AIRPLANE_COUNT = 10;
+const AIRPLANE_SCALE = 2.4;
 let airplaneBannerTex = null;
+const airplaneList = []; // { group, propeller, radius, height, speed, dir, phase }
 
 function makeAirplaneBannerTexture(text) {
   const canvas = document.createElement("canvas");
@@ -1171,10 +1184,10 @@ function makeAirplaneBannerTexture(text) {
   ctx.fillStyle = "#ff5f8f";
 
   // Sama seperti perbaikan banner "HAPPY BIRTHDAY" di monumen (lihat
-  // shrinkFontToFit & Log Keputusan Desain) — teks baliho ini ("Selamat
-  // Ulang Tahun Sayangku", cukup panjang) juga bisa melebihi lebar kanvas
-  // di font-size 150px tetap, terutama kalau font 'Baloo 2' jatuh ke
-  // fallback sans-serif. Dibatasi supaya tetap di dalam garis tepi baliho.
+  // shrinkFontToFit & Log Keputusan Desain) — teks baliho ini bisa
+  // melebihi lebar kanvas di font-size 150px tetap, terutama kalau font
+  // 'Baloo 2' jatuh ke fallback sans-serif. Dibatasi supaya tetap di
+  // dalam garis tepi baliho.
   const fontSpec = (sz) => `900 ${sz}px 'Baloo 2', sans-serif`;
   shrinkFontToFit(ctx, fontSpec, 150, (2048 - 28 * 2) * 0.94, () => ctx.measureText(text).width, 50);
   ctx.textAlign = "center";
@@ -1183,10 +1196,15 @@ function makeAirplaneBannerTexture(text) {
   return new THREE.CanvasTexture(canvas);
 }
 
-function buildAirplane() {
+// Membangun SATU unit pesawat+baliho (dipanggil 10x oleh buildAirplanes()).
+// Tekstur baliho (`airplaneBannerTex`) dibuat sekali saja di luar fungsi
+// ini dan dipakai bersama oleh ke-10 pesawat lewat satu `bannerMat` yang
+// sama — sepuluh canvas 2048x320 terpisah tidak perlu, teksnya toh identik
+// ("Selamat Ulang Tahun Sayang"), jadi cukup satu texture di-share.
+function buildOneAirplane(bannerMat) {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.15 });
-  const accentMat = new THREE.MeshStandardMaterial({ color: 0xff8fb8, roughness: 0.5 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.15, fog: false });
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0xff8fb8, roughness: 0.5, fog: false });
 
   const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.5, 6, 12), bodyMat);
   fuselage.rotation.z = Math.PI / 2;
@@ -1208,49 +1226,63 @@ function buildAirplane() {
   group.add(tailFin);
 
   const propeller = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.6, 0.12),
-    new THREE.MeshStandardMaterial({ color: 0x3a2f38 }));
+    new THREE.MeshStandardMaterial({ color: 0x3a2f38, fog: false }));
   propeller.position.set(4.6, 0, 0);
   group.add(propeller);
 
   // baliho besar di belakang, ditarik pakai "tali"
-  airplaneBannerTex = makeAirplaneBannerTexture("Selamat Ulang Tahun Sayangku");
-  const bannerMat = new THREE.MeshBasicMaterial({ map: airplaneBannerTex, side: THREE.DoubleSide, toneMapped: false });
-  const bannerW = 26, bannerH = 4.1;
+  const bannerW = 34, bannerH = 5.6;
   const bannerFront = new THREE.Mesh(new THREE.PlaneGeometry(bannerW, bannerH), bannerMat);
   bannerFront.position.set(-3.1 - bannerW / 2 - 3, -1.6, 0);
   group.add(bannerFront);
 
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 4),
-    new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    new THREE.MeshStandardMaterial({ color: 0xffffff, fog: false }));
   rope.rotation.z = Math.PI / 2 - 0.5;
   rope.position.set(-4.6, -0.8, 0);
   group.add(rope);
 
   group.traverse((o) => { if (o.isMesh && o !== bannerFront) o.castShadow = true; });
-  group.userData.propeller = propeller;
+  group.scale.set(AIRPLANE_SCALE, AIRPLANE_SCALE, AIRPLANE_SCALE);
   scene.add(group);
-  airplaneGroup = group;
+  return { group, propeller };
 }
 
-function updateAirplane(elapsed, dt) {
-  if (!airplaneGroup) return;
-  // Radius dibesarkan mendekati dinding bebatuan batas dunia (bukan cuma
-  // muter di tengah peta) — supaya pesawat+baliho terlihat melintas TEPAT
-  // DI ATAS garis pegunungan batas, kelihatan dari mana pun di lintasan.
-  const R = WORLD_HALF * 0.9;
-  const speed = 0.035;
-  const t = elapsed * speed;
-  const x = Math.cos(t) * R;
-  const z = Math.sin(t) * R;
-  const y = 78 + Math.sin(elapsed * 0.15) * 8; // jelas di atas puncak tebing batas (~28 unit)
-  airplaneGroup.position.set(x, y, z);
-  // hadapkan ke arah gerak (turunan posisi lingkaran)
-  const dirX = -Math.sin(t), dirZ = Math.cos(t);
-  airplaneGroup.rotation.y = Math.atan2(dirX, dirZ);
-  airplaneGroup.rotation.z = Math.sin(elapsed * 0.4) * 0.05;
-  if (airplaneGroup.userData.propeller) {
-    airplaneGroup.userData.propeller.rotation.x += dt * 40;
+function buildAirplanes() {
+  airplaneBannerTex = makeAirplaneBannerTexture("Selamat Ulang Tahun Sayang");
+  const bannerMat = new THREE.MeshBasicMaterial({ map: airplaneBannerTex, side: THREE.DoubleSide, toneMapped: false, fog: false });
+  for (let i = 0; i < AIRPLANE_COUNT; i++) {
+    const { group, propeller } = buildOneAirplane(bannerMat);
+    // Radius disebar 0.55..0.885 dari WORLD_HALF — masih dekat dinding
+    // bebatuan batas dunia (mengitari batas bukit bebatuan, sesuai
+    // permintaan awal user) tapi sebagian sengaja ditarik sedikit lebih
+    // dekat supaya jauh lebih mudah terlihat dari lintasan, bukan cuma
+    // menumpuk persis di garis batas terjauh.
+    const radius = WORLD_HALF * (0.55 + 0.035 * i);
+    // Ketinggian & kecepatan divariasikan per pesawat (bukan angka sama
+    // semua) supaya ke-10 pesawat tidak bertabrakan satu sama lain dan
+    // gerakannya terasa jelas hidup, bukan seperti satu formasi kaku.
+    const height = 46 + (i % 5) * 11;
+    const speed = 0.05 + (i % 4) * 0.011;
+    const dir = i % 2 === 0 ? 1 : -1; // separuh searah jarum jam, separuh berlawanan
+    const phase = (i / AIRPLANE_COUNT) * Math.PI * 2;
+    airplaneList.push({ group, propeller, radius, height, speed, dir, phase });
   }
+}
+
+function updateAirplanes(elapsed, dt) {
+  airplaneList.forEach((p) => {
+    const t = p.phase + elapsed * p.speed * p.dir;
+    const x = Math.cos(t) * p.radius;
+    const z = Math.sin(t) * p.radius;
+    const y = p.height + Math.sin(elapsed * 0.15 + p.phase) * 6;
+    p.group.position.set(x, y, z);
+    // hadapkan ke arah gerak (turunan posisi lingkaran, ikut arah `dir`)
+    const dirX = -Math.sin(t) * p.dir, dirZ = Math.cos(t) * p.dir;
+    p.group.rotation.y = Math.atan2(dirX, dirZ);
+    p.group.rotation.z = Math.sin(elapsed * 0.4 + p.phase) * 0.05;
+    if (p.propeller) p.propeller.rotation.x += dt * 40;
+  });
 }
 
 // =====================================================================
@@ -1354,7 +1386,7 @@ function buildCat(x, z) {
 
 function buildCityAnimals() {
   const builders = [buildDog, buildCapybara, buildCat];
-  const COUNT = 45;
+  const COUNT = 200; // dinaikkan lagi dari 110 — permintaan user memperbanyak lagi biar makin ramai
   for (let i = 0; i < COUNT; i++) {
     const spot = findClearRandomSpot(3);
     if (!spot) continue;
@@ -1382,17 +1414,138 @@ function updateAnimals(elapsed) {
 }
 
 function buildCityPeople() {
-  const COUNT = 45;
+  const COUNT = 200; // dinaikkan lagi dari 110 — permintaan user memperbanyak lagi biar makin ramai
   for (let i = 0; i < COUNT; i++) {
     const spot = findClearRandomSpot(3);
     if (!spot) continue;
     const person = buildPersonNPC(spot.x, spot.z);
     crowdPeople.push({ group: person, phase: Math.random() * Math.PI * 2 });
+    // Sebagian orang (1 dari 2, bukan semua 200) dijadikan "penyapa" —
+    // permintaan user: setengah dari orang-orang kota (100 dari 200) punya
+    // balon dialog ucapan ulang tahun saat mobil mendekat. Dinaikkan dari
+    // sebelumnya 1/8 (~25 orang) ke 1/2 (100 orang) sesuai permintaan.
+    if (i % 2 === 0) attachGreeterBubble(person);
   }
 }
 
+// =====================================================================
+// SECTION 8B4 — BALON DIALOG UCAPAN ULANG TAHUN (muncul saat mobil dekat)
+// =====================================================================
+// Permintaan user: sebagian orang random, kalau didekati mobil, memunculkan
+// balon dialog ucapan ulang tahun (versi kalimat berbeda-beda per orang),
+// lalu balonnya hilang lagi begitu mobil menjauh.
+
+const GREETER_MESSAGES = [
+  "Selamat ulang tahun! 🎉",
+  "Happy Birthday! 🎂",
+  "Semoga panjang umur ya! 🥳",
+  "Met ultah! 🎈🎁",
+  "Wish you all the best! ✨",
+  "Semoga makin bahagia! 💖",
+  "Happy Birthday Gabriela! 🌸",
+  "Selamat bertambah usia! 🎊",
+  "Sehat & bahagia selalu! 🙏",
+  "Cheers to you! 🥂🎉",
+  "You deserve the best! 💫",
+  "Semoga semua wish-nya terkabul! 🌟",
+];
+
+const GREETER_TRIGGER_RADIUS = 9; // jarak (unit dunia) mobil ke orang supaya balonnya muncul
+let greeterMsgCounter = 0; // penghitung round-robin (bukan Math.random murni) supaya variasi kalimat benar-benar tersebar rata ke semua penyapa, bukan kebetulan sering berulang
+const greeterList = []; // { group, sprite, active } — dicek jaraknya ke mobil tiap frame oleh updateGreeters()
+
+// Menggambar bentuk balon percakapan (rounded-rect + ekor runcing ke
+// bawah, gaya komik) berisi satu kalimat ucapan, sebagai canvas texture.
+// Satu texture unik per orang terpilih (isi kalimatnya beda-beda) — jumlah
+// penyapa dibatasi (lihat buildCityPeople) jadi tidak menghasilkan
+// puluhan canvas besar sekaligus.
+function makeSpeechBubbleTexture(text) {
+  const W = 512, H = 288;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const pad = 16, bodyH = H - 64, r = 36;
+  const x0 = pad, y0 = pad, w0 = W - pad * 2, h0 = bodyH - pad;
+
+  ctx.fillStyle = "#fffdf7";
+  ctx.strokeStyle = "#ff8fb8";
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.moveTo(x0 + r, y0);
+  ctx.lineTo(x0 + w0 - r, y0);
+  ctx.quadraticCurveTo(x0 + w0, y0, x0 + w0, y0 + r);
+  ctx.lineTo(x0 + w0, y0 + h0 - r);
+  ctx.quadraticCurveTo(x0 + w0, y0 + h0, x0 + w0 - r, y0 + h0);
+  ctx.lineTo(x0 + r, y0 + h0);
+  ctx.quadraticCurveTo(x0, y0 + h0, x0, y0 + h0 - r);
+  ctx.lineTo(x0, y0 + r);
+  ctx.quadraticCurveTo(x0, y0, x0 + r, y0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // ekor runcing menunjuk ke bawah, ke arah kepala orangnya
+  const midX = W / 2;
+  ctx.beginPath();
+  ctx.moveTo(midX - 24, y0 + h0 - 6);
+  ctx.lineTo(midX, H - 8);
+  ctx.lineTo(midX + 24, y0 + h0 - 6);
+  ctx.closePath();
+  ctx.fillStyle = "#fffdf7";
+  ctx.fill();
+
+  // teks — pakai shrinkFontToFit yang sama dipakai banner lain (lihat Log
+  // Keputusan Desain "HAPPY BIRTHDAY terpotong") supaya kalimat sepanjang
+  // apa pun dijamin muat di dalam gelembungnya.
+  ctx.fillStyle = "#8a3b63";
+  const fontSpec = (sz) => `700 ${sz}px 'Baloo 2', sans-serif`;
+  shrinkFontToFit(ctx, fontSpec, 52, w0 * 0.88, () => ctx.measureText(text).width, 22);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, midX, y0 + h0 / 2);
+  return new THREE.CanvasTexture(canvas);
+}
+
+// Menempelkan satu balon dialog (Sprite, otomatis selalu menghadap kamera)
+// sebagai child dari group orangnya sendiri — supaya posisinya otomatis
+// ikut kalau suatu saat orangnya digerakkan, tanpa perlu sinkronisasi
+// manual. Disembunyikan (`visible = false`) sejak awal; baru dimunculkan
+// oleh updateGreeters() berdasarkan jarak ke mobil.
+function attachGreeterBubble(personGroup) {
+  const message = GREETER_MESSAGES[greeterMsgCounter % GREETER_MESSAGES.length];
+  greeterMsgCounter++;
+  const tex = makeSpeechBubbleTexture(message);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, fog: false });
+  const sprite = new THREE.Sprite(mat);
+  // Diperbesar (2.6x1.46 -> 4.4x2.48, permintaan user) supaya lebih jelas
+  // terbaca dari kejauhan/saat berkendara. Posisi vertikal ikut dinaikkan
+  // (2.55 -> 3.15) supaya ekor balon yang sekarang lebih besar tetap
+  // menggantung rapi di atas kepala, tidak menembus/menimpa kepala orangnya.
+  sprite.scale.set(4.4, 2.48, 1);
+  sprite.position.set(0, 3.15, 0); // di atas kepala (kepala orangnya ada di lokal y~1.5-1.8)
+  sprite.visible = false;
+  personGroup.add(sprite);
+  greeterList.push({ group: personGroup, sprite, active: false });
+}
+
+// Dipanggil tiap frame (animate()): cek jarak 2D mobil ke tiap penyapa —
+// dalam radius, tampilkan balonnya; di luar radius, sembunyikan lagi.
+// Pengecekan `near !== g.active` supaya `sprite.visible` cuma di-set saat
+// benar-benar berubah status (masuk/keluar radius), bukan tiap frame.
+function updateGreeters() {
+  greeterList.forEach((g) => {
+    const dx = g.group.position.x - carState.x;
+    const dz = g.group.position.z - carState.z;
+    const near = (dx * dx + dz * dz) < GREETER_TRIGGER_RADIUS * GREETER_TRIGGER_RADIUS;
+    if (near !== g.active) {
+      g.active = near;
+      g.sprite.visible = near;
+    }
+  });
+}
+
 function buildCityClowns() {
-  const COUNT = 10;
+  const COUNT = 30; // dinaikkan dari 10 — permintaan user memperbanyak badut juga
   for (let i = 0; i < COUNT; i++) {
     const spot = findClearRandomSpot(4);
     if (!spot) continue;
@@ -2903,7 +3056,8 @@ function animate() {
   updateBirds(elapsed);
   updateClowns(elapsed);
   updateAnimals(elapsed);
-  updateAirplane(elapsed, dt);
+  updateAirplanes(elapsed, dt);
+  updateGreeters();
   checkCakeTrigger();
 
   renderer.render(scene, camera);
@@ -2942,7 +3096,7 @@ function init() {
   buildRaceTrack();
   buildLandmark();
   buildClowns();
-  buildAirplane();
+  buildAirplanes();
   buildPhotoGates();
   buildBigBuildings();
   buildTugus();

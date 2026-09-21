@@ -239,7 +239,7 @@ html, body {
   font-size: 16px;
   font-family: 'Quicksand', sans-serif;
   outline: none;
-  margin-bottom: 34px;
+  margin-bottom: 64px; /* 34px awal + 30px tambahan sesuai permintaan user, jarak ke tombol di bawahnya makin lega */
   text-align: center;
 }
 #lock-input:focus { border-color: var(--pink-deep); }
