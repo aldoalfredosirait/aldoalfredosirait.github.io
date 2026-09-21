@@ -1496,6 +1496,28 @@ const GREETER_TRIGGER_RADIUS = 9; // jarak (unit dunia) mobil ke orang supaya ba
 let greeterMsgCounter = 0; // index urut 0..199 -> dipetakan getUniqueGreeterMessage() jadi kalimat unik, lihat penjelasan di atas
 const greeterList = []; // { group, sprite, active } — dicek jaraknya ke mobil tiap frame oleh updateGreeters()
 
+// Memecah `text` jadi baris-baris yang masing-masing tidak lebih lebar dari
+// `maxWidth` (pemenggalan per kata, pakai ctx.font yang sedang aktif). Satu
+// kata yang sendirinya lebih lebar dari maxWidth tetap ditaruh utuh di
+// barisnya sendiri (tidak dipotong per huruf) — pemanggil yang menangani
+// dengan mengecilkan font.
+function wrapTextToLines(ctx, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let current = "";
+  words.forEach((word) => {
+    const candidate = current ? current + " " + word : word;
+    if (!current || ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
+
 // Menggambar bentuk balon percakapan (rounded-rect + ekor runcing ke
 // bawah, gaya komik) berisi satu kalimat ucapan, sebagai canvas texture.
 // Satu texture unik per orang (SEMUA 200 orang kota sekarang punya
@@ -1537,15 +1559,36 @@ function makeSpeechBubbleTexture(text) {
   ctx.fillStyle = "#fffdf7";
   ctx.fill();
 
-  // teks — pakai shrinkFontToFit yang sama dipakai banner lain (lihat Log
-  // Keputusan Desain "HAPPY BIRTHDAY terpotong") supaya kalimat sepanjang
-  // apa pun dijamin muat di dalam gelembungnya.
+  // teks — DIBUNGKUS jadi beberapa baris (word-wrap) lalu dicari ukuran font
+  // terbesar yang muat di lebar DAN tinggi gelembung. Sebelumnya teks
+  // digambar 1 baris + shrinkFontToFit (min 22px) yang tidak mengecek
+  // apakah sudah muat, sehingga kalimat panjang (opener + harapan, ~75
+  // karakter) meluber & terpotong di tepi gelembung. Lihat Log Keputusan
+  // Desain "Teks balon dialog terpotong".
   ctx.fillStyle = "#8a3b63";
   const fontSpec = (sz) => `700 ${sz}px 'Baloo 2', sans-serif`;
-  shrinkFontToFit(ctx, fontSpec, 52, w0 * 0.88, () => ctx.measureText(text).width, 22);
+  const innerW = w0 - 64;  // sisa 32px kiri-kanan: melewati garis tepi (9px) + lengkung sudut (r=36)
+  const innerH = h0 - 48;  // sisa 24px atas-bawah
+  const LINE_HEIGHT = 1.2;
+  const MAX_FONT = 46, MIN_FONT = 16;
+  let fontSize = MAX_FONT;
+  let lines = [text];
+  for (; fontSize >= MIN_FONT; fontSize -= 2) {
+    ctx.font = fontSpec(fontSize);
+    lines = wrapTextToLines(ctx, text, innerW);
+    const widest = Math.max.apply(null, lines.map((l) => ctx.measureText(l).width));
+    if (widest <= innerW && lines.length * fontSize * LINE_HEIGHT <= innerH) break;
+  }
+  if (fontSize < MIN_FONT) { // tidak ada yang muat -> pakai ukuran terkecil (kasus ekstrem, kalimat sangat panjang)
+    fontSize = MIN_FONT;
+    ctx.font = fontSpec(fontSize);
+    lines = wrapTextToLines(ctx, text, innerW);
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, midX, y0 + h0 / 2);
+  const lineH = fontSize * LINE_HEIGHT;
+  const firstY = y0 + h0 / 2 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, midX, firstY + i * lineH));
   return new THREE.CanvasTexture(canvas);
 }
 

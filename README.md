@@ -160,6 +160,39 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 6) — Teks balon dialog terpotong: diganti word-wrap multi-baris + font auto-fit lebar & tinggi
+Permintaan user: teks di balon dialog ucapan ulang tahun tidak tercover
+dengan baik oleh kotak dialognya — terpotong di tepi dan tidak terbaca.
+
+**Akar masalah** (di `makeSpeechBubbleTexture()`, SECTION 8B4): dua hal
+yang saling memperparah. (1) Kalimat (opener + harapan dari
+`getUniqueGreeterMessage()`, bisa ~75 karakter dgn emoji) digambar dalam
+SATU baris, padahal lebar teks yang tersedia di canvas 512px cuma ~450px.
+(2) `shrinkFontToFit()` — yang dipakai untuk mengecilkan font — berhenti di
+font minimum (22px) TANPA memeriksa apakah teksnya sudah muat, jadi untuk
+kalimat panjang hasil akhirnya tetap lebih lebar dari gelembung dan
+terpotong di kiri-kanan. (Efek ini baru terlihat setelah balon dinaikkan
+ke semua 200 orang dgn kalimat gabungan opener × harapan yang panjang —
+lihat entri lanjutan 4.)
+
+**Perbaikan**: teks sekarang dipecah per kata jadi beberapa baris lewat
+helper baru `wrapTextToLines(ctx, text, maxWidth)`, lalu font dicari dari
+besar ke kecil (46px → 16px, langkah 2px) sampai SEMUA baris muat di
+lebar area teks (`w0 - 64`, menyisakan 32px tiap sisi supaya tidak
+menyentuh garis tepi/lengkung sudut) DAN total tinggi baris muat di tinggi
+gelembung (`h0 - 48`). Baris digambar terpusat secara vertikal & horizontal.
+`shrinkFontToFit()` TIDAK diubah/dihapus karena masih dipakai banner
+lain (gerbang, monumen, baliho pesawat); hanya balon dialog yang tidak
+lagi memakainya. Ukuran sprite (4.4×2.48), posisi (`y=3.15`), resolusi canvas
+(512×288), dan radius pemicu tidak diubah — sengaja tidak menaikkan
+resolusi canvas karena ada 200 texture, menaikkannya akan melipatgandakan
+pemakaian memori GPU.
+
+**Verifikasi**: logika yang sama disimulasikan untuk ke-200 kalimat (di
+luar browser, pakai font fallback yang lebih lebar dari Baloo 2 sehingga
+tesnya lebih ketat): 0 balon yang meluber, font terkecil 28px (naik dari
+22px yang sebelumnya tetap terpotong), maksimal 4 baris per balon.
+
 ### 2026-09-21 (lanjutan 5) — Tampilan mobile (tanpa keyboard) dibuat bersih: default kamera Jauh, HUD disembunyikan
 Permintaan user, khusus untuk perangkat mobile tanpa keyboard fisik
 (perangkat sentuh murni):
