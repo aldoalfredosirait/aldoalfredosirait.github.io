@@ -13,9 +13,13 @@
 const LOCK_PASSWORD = "27012026";
 const LOCK_HINT = "sandi hp android kamuuu 🫵";
 
+// --- Nama yang berulang tahun (dipakai di judul surat & baris pembuka di
+//     bawah — GANTI di sini kalau suatu saat dipakai utk orang lain) ---
+const BIRTHDAY_PERSON_NAME = "Gabriela Oktaviany Sihaloho";
+
 // --- Isi surat ulang tahun (GANTI di sini sesuka hati) ---
 const BIRTHDAY_LETTER_LINES = [
-  "Happy Birthday, sayang! 🎉",
+  `Happy Birthday, ${BIRTHDAY_PERSON_NAME}! 🎉`,
   "Maaf ya, cuma bisa rayain ini lewat mobil-mobilan kecil yang muter satu kota, bukan meluk kamu langsung. Jarak emang nyebelin.",
   "Tapi walau LDR-an, rasanya nggak pernah kalah jauh sama sayangnya aku ke kamu.",
   "Semoga di sana kamu sehat terus, makin cantik/ganteng, dan makin sabar hadapin aku yang suka rewel kalau kangen. 😆",
@@ -433,6 +437,28 @@ function makeBannerTexture(text, bg) {
   return new THREE.CanvasTexture(canvas);
 }
 
+// --- Utilitas bersama dipakai SEMUA banner teks kanvas yang teksnya bisa
+// panjang/berubah (banner "HAPPY BIRTHDAY" di monumen & baliho pesawat di
+// bawah): kecilkan font-size bertahap dari initialSize sampai lebar teks
+// (dihitung lewat callback `measureWidth`, dipanggil ulang tiap ctx.font
+// berganti) muat dalam `maxWidth` piksel. Tanpa ini, font-size yang
+// dikunci mati bisa melebihi lebar kanvas & tulisannya terpotong di kedua
+// ujung — apalagi karena font 'Baloo 2' dimuat dari Google Fonts (lihat
+// @import di style.css) dan bisa diam-diam jatuh ke fallback 'sans-serif'
+// yang jauh lebih lebar kalau gagal/telat dimuat (mis. index.html dibuka
+// offline lewat file://, sesuai Cara Pakai README). Lihat Log Keputusan
+// Desain untuk kronologi bug ini. ---
+function shrinkFontToFit(ctx, fontSpec, initialSize, maxWidth, measureWidth, minSize) {
+  minSize = minSize || 40;
+  let size = initialSize;
+  while (size > minSize) {
+    ctx.font = fontSpec(size);
+    if (measureWidth() <= maxWidth) break;
+    size -= 6;
+  }
+  return size;
+}
+
 function buildRaceGate(x, z, angle, text, bg) {
   const group = new THREE.Group();
   const poleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
@@ -645,23 +671,32 @@ function makeColorfulTextTexture(text) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, 2048, 460);
   const colors = ["#ff6f9f", "#ffd166", "#ffffff", "#8fd0f7", "#c9a8ff"];
-  ctx.font = "900 260px 'Baloo 2', sans-serif";
+
+  // Font-size mulai dari 260px (ukuran "sangat besar" sesuai permintaan
+  // user sebelumnya) tapi otomatis diperkecil kalau perlu supaya SELALU
+  // muat dalam lebar kanvas dengan margin ~6% tiap sisi — sebelumnya
+  // ukurannya dikunci mati 260px tanpa pengecekan lebar sama sekali,
+  // itulah sebabnya tulisannya bisa terpotong di kedua ujung. Widths
+  // per-huruf dihitung ulang tiap kali shrinkFontToFit mencoba font-size
+  // baru (lewat closure di bawah) supaya hasil akhirnya presis dipakai
+  // saat menggambar. Lihat shrinkFontToFit() & Log Keputusan Desain.
+  const fontSpec = (sz) => `900 ${sz}px 'Baloo 2', sans-serif`;
+  let widths = [];
+  const fontSizeUsed = shrinkFontToFit(ctx, fontSpec, 260, canvas.width * 0.88, () => {
+    widths = [...text].map((ch) => ctx.measureText(ch).width);
+    return widths.reduce((a, b) => a + b, 0);
+  }, 90);
+  const total = widths.reduce((a, b) => a + b, 0);
+
   ctx.textBaseline = "middle";
-  const widths = [];
-  let total = 0;
-  for (const ch of text) {
-    const w = ctx.measureText(ch).width;
-    widths.push(w);
-    total += w;
-  }
-  let x = (2048 - total) / 2;
+  let x = (canvas.width - total) / 2;
   let ci = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch !== " ") {
       ctx.fillStyle = colors[ci % colors.length];
       ctx.strokeStyle = "rgba(122, 90, 110, 0.55)";
-      ctx.lineWidth = 10;
+      ctx.lineWidth = Math.max(4, fontSizeUsed / 26); // stroke ikut menyesuaikan proporsional kalau font mengecil
       ctx.textAlign = "left";
       ctx.strokeText(ch, x, 236);
       ctx.fillText(ch, x, 236);
@@ -1134,7 +1169,14 @@ function makeAirplaneBannerTexture(text) {
   ctx.lineWidth = 18;
   ctx.strokeRect(14, 14, 2048 - 28, 320 - 28);
   ctx.fillStyle = "#ff5f8f";
-  ctx.font = "900 150px 'Baloo 2', sans-serif";
+
+  // Sama seperti perbaikan banner "HAPPY BIRTHDAY" di monumen (lihat
+  // shrinkFontToFit & Log Keputusan Desain) — teks baliho ini ("Selamat
+  // Ulang Tahun Sayangku", cukup panjang) juga bisa melebihi lebar kanvas
+  // di font-size 150px tetap, terutama kalau font 'Baloo 2' jatuh ke
+  // fallback sans-serif. Dibatasi supaya tetap di dalam garis tepi baliho.
+  const fontSpec = (sz) => `900 ${sz}px 'Baloo 2', sans-serif`;
+  shrinkFontToFit(ctx, fontSpec, 150, (2048 - 28 * 2) * 0.94, () => ctx.measureText(text).width, 50);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, 1024, 168);
@@ -1820,6 +1862,223 @@ function updateBirds(elapsed) {
 }
 
 // =====================================================================
+// SECTION 8F — HAMPARAN BUNGA MEMBENTUK TULISAN "SELAMAT ULANG TAHUN SAYANG"
+// =====================================================================
+// Awalnya (lihat Log Keputusan Desain 2026-09-21 versi pertama) bunga
+// disebar acak dalam beberapa "petak" bundar. Permintaan user berikutnya:
+// susunan bunganya sendiri harus MEMBENTUK tulisan "SELAMAT ULANG TAHUN
+// SAYANG" (bukan cuma tersebar acak). Lihat Log Keputusan Desain untuk
+// alasan desain lengkapnya.
+//
+// Pendekatan: font bitmap 5x7 piksel sederhana (`FLOWER_FONT_5X7`, tanpa
+// font/model eksternal — konsisten dgn batasan proyek, prinsip yang sama
+// dipakai tanda huruf 3D di landmark) dipakai utk menghasilkan grid sel
+// "menyala/mati" per huruf lewat `layoutFlowerTextGrid()`. Tiap sel yang
+// menyala jadi satu titik bunga (`buildFlowerTextPositions()`); teks
+// disusun 3 baris ("SELAMAT" / "ULANG TAHUN" / "SAYANG") supaya lebar
+// totalnya tetap wajar dibanding radius aman yang dicari lewat
+// `findClearRandomSpot()`. Sisa bunga (di luar tulisan) tetap disebar
+// sebagai beberapa petak aksen acak kecil, memakai pendekatan lama,
+// supaya dunia tidak terasa kosong di sekitar tulisan.
+//
+// Render tetap lewat 3 InstancedMesh (batang, kepala bulat, kepala
+// bintang) — bukan THREE.Group per bunga seperti NPC/hewan di atas —
+// supaya ratusan bunga (termasuk seluruh tulisan) tetap sangat murah
+// di-render (1 draw call per jenis bagian, persis pendekatan yang sudah
+// dipakai buildBoundaryWalls() utk ratusan batu). Bunga SENGAJA tidak
+// diberi collider sama sekali (bunga rumput kecil, bukan penghalang
+// solid) — mobil bebas melintasi hamparan maupun tulisannya, alasannya
+// sama dengan kenapa pohon latar massal dulu tidak diberi collider
+// individual.
+
+const FLOWER_HEAD_COLORS = [0xff8fb8, 0xffe066, 0xc9a8ff, 0xffffff, 0xff6f9f, 0x8fd0f7, 0xffb366];
+const FLOWER_TEXT_HEAD_COLORS = [0xff6f9f, 0xff8fb8, 0xffffff, 0xffe066]; // palet lebih dominan pink/putih di tulisan supaya lebih kebaca jelas
+const FLOWER_ACCENT_PATCH_COUNT = 3; // petak bunga acak tambahan di luar tulisan (sebelumnya 6 petak, dulu semuanya acak — lihat Log Keputusan Desain)
+const FLOWERS_PER_PATCH_MIN = 70;
+const FLOWERS_PER_PATCH_MAX = 110;
+const FLOWER_PATCH_RADIUS = 8; // tetap di dalam jarak aman findClearRandomSpot terhadap lintasan (lihat komentar di dalam buildFlowerFields)
+
+// --- Font bitmap 5x7 piksel (cuma huruf yang dipakai di teks ucapan) ---
+const FLOWER_FONT_5X7 = {
+  A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+  G: ["01111", "10000", "10000", "10011", "10001", "10001", "01111"],
+  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
+  M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
+  N: ["10001", "11001", "10101", "10101", "10011", "10001", "10001"],
+  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+  U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+  Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
+};
+const FLOWER_GLYPH_W = 5;
+const FLOWER_GLYPH_H = 7;
+const FLOWER_CHAR_GAP = 1;   // jarak antar huruf (kolom)
+const FLOWER_SPACE_W = 3;    // lebar spasi antar kata (kolom)
+const FLOWER_LINE_GAP = 2;   // jarak antar baris (baris)
+const FLOWER_TEXT_LINES = ["SELAMAT", "ULANG TAHUN", "SAYANG"];
+const FLOWER_TEXT_CELL_SIZE = 1.6; // unit dunia per sel grid font — menentukan ukuran akhir tulisan
+
+// Menyusun FLOWER_TEXT_LINES jadi daftar sel grid {gx, gy} (gy=0 di baris
+// paling atas) yang "menyala", plus lebar & tinggi total grid (dalam
+// satuan sel) supaya pemanggil bisa menghitung radius pencarian titik
+// jangkar yang aman.
+function layoutFlowerTextGrid() {
+  const lineLayouts = FLOWER_TEXT_LINES.map((line) => {
+    let col = 0;
+    const chars = [];
+    for (const ch of line) {
+      if (ch === " ") {
+        col += FLOWER_SPACE_W + FLOWER_CHAR_GAP;
+        continue;
+      }
+      const glyph = FLOWER_FONT_5X7[ch];
+      if (!glyph) { col += FLOWER_GLYPH_W + FLOWER_CHAR_GAP; continue; } // huruf tak dikenal di font: lewati sbg spasi kosong, tetap aman
+      chars.push({ x0: col, glyph });
+      col += FLOWER_GLYPH_W + FLOWER_CHAR_GAP;
+    }
+    return { chars, width: Math.max(0, col - FLOWER_CHAR_GAP) };
+  });
+
+  const gridWidth = Math.max(...lineLayouts.map((l) => l.width));
+  const gridHeight = lineLayouts.length * FLOWER_GLYPH_H + (lineLayouts.length - 1) * FLOWER_LINE_GAP;
+
+  const cells = [];
+  lineLayouts.forEach((lineLayout, li) => {
+    const rowOffset = li * (FLOWER_GLYPH_H + FLOWER_LINE_GAP);
+    const xOffset = (gridWidth - lineLayout.width) / 2; // pusatkan baris yang lebih pendek dari baris terlebar
+    lineLayout.chars.forEach((c) => {
+      for (let r = 0; r < FLOWER_GLYPH_H; r++) {
+        const rowBits = c.glyph[r];
+        for (let col = 0; col < FLOWER_GLYPH_W; col++) {
+          if (rowBits[col] === "1") cells.push({ gx: c.x0 + col + xOffset, gy: rowOffset + r });
+        }
+      }
+    });
+  });
+
+  return { cells, gridWidth, gridHeight };
+}
+
+// Mengubah grid huruf jadi daftar bunga individual di koordinat dunia
+// (x/z, rata di tanah — sama seperti petak bunga acak lama), lengkap
+// dengan jitter kecil per-bunga supaya tulisan tetap terasa "kebun bunga
+// asli", bukan grid piksel yang kaku.
+function buildFlowerTextPositions() {
+  const grid = layoutFlowerTextGrid();
+  if (grid.cells.length === 0) return [];
+
+  const halfW = (grid.gridWidth * FLOWER_TEXT_CELL_SIZE) / 2;
+  const halfH = (grid.gridHeight * FLOWER_TEXT_CELL_SIZE) / 2;
+  // Radius pencarian = setengah diagonal kotak tulisan + sedikit margin,
+  // supaya findClearRandomSpot menjamin SELURUH kotak tulisan (bukan cuma
+  // titik tengahnya saja) bebas dari lintasan/air/bangunan lain.
+  const searchRadius = Math.ceil(Math.hypot(halfW, halfH)) + 6;
+  const anchor = findClearRandomSpot(searchRadius, 100) || findClearRandomSpot(Math.round(searchRadius * 0.7), 150);
+  if (!anchor) return []; // dunia kebetulan terlalu padat di semua sisi — lewati tulisan, petak aksen di bawah tetap jalan seperti biasa
+
+  const jitter = FLOWER_TEXT_CELL_SIZE * 0.28;
+  return grid.cells.map((cell) => ({
+    x: anchor.x + cell.gx * FLOWER_TEXT_CELL_SIZE - halfW + (Math.random() - 0.5) * jitter,
+    z: anchor.z + cell.gy * FLOWER_TEXT_CELL_SIZE - halfH + (Math.random() - 0.5) * jitter,
+    stemH: 0.26 + Math.random() * 0.2,
+    scale: 0.8 + Math.random() * 0.5,
+    rotY: Math.random() * Math.PI * 2,
+    tilt: (Math.random() - 0.5) * 0.18,
+    colorHex: FLOWER_TEXT_HEAD_COLORS[Math.floor(Math.random() * FLOWER_TEXT_HEAD_COLORS.length)],
+    isStar: Math.random() < 0.35,
+  }));
+}
+
+function buildFlowerFields() {
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x4caa6e, roughness: 0.85 });
+  // Material kepala sengaja putih polos (0xffffff) — warna asli tiap
+  // instance datang dari setColorAt() di bawah, dan mengalikan warna
+  // instance dengan putih (1,1,1) membiarkannya tampil apa adanya.
+  const roundHeadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+  const starHeadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+
+  const stemGeo = new THREE.CylinderGeometry(0.035, 0.05, 1, 5); // tinggi dasar 1 unit, diskalakan per-instance lewat matrix
+  const roundHeadGeo = new THREE.SphereGeometry(0.16, 8, 6);
+  const starHeadGeo = new THREE.OctahedronGeometry(0.19, 0);
+
+  // Bunga tulisan dulu, baru petak aksen acak ditambahkan ke array yang sama.
+  const allFlowers = buildFlowerTextPositions(); // { x, z, stemH, scale, rotY, tilt, colorHex, isStar }
+
+  for (let p = 0; p < FLOWER_ACCENT_PATCH_COUNT; p++) {
+    // Margin (radius+3) menjaga petak tidak tumpang tindih bangunan/air —
+    // jarak aman ke LINTASAN sendiri sudah dijamin tetap (>=16 unit dari
+    // titik tengah ke as jalan) oleh findClearRandomSpot terlepas dari
+    // margin ini, jadi FLOWER_PATCH_RADIUS (8) sengaja dijaga lebih kecil
+    // dari jarak amannya supaya bunga di tepi petak tidak pernah nyampai
+    // ke aspal (TRACK_HALF_WIDTH=7).
+    const center = findClearRandomSpot(FLOWER_PATCH_RADIUS + 3);
+    if (!center) continue;
+    const count = FLOWERS_PER_PATCH_MIN + Math.floor(Math.random() * (FLOWERS_PER_PATCH_MAX - FLOWERS_PER_PATCH_MIN));
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * FLOWER_PATCH_RADIUS; // sqrt supaya sebaran rata per luas (bukan menumpuk di tengah)
+      allFlowers.push({
+        x: center.x + Math.cos(ang) * rad,
+        z: center.z + Math.sin(ang) * rad,
+        stemH: 0.28 + Math.random() * 0.22,
+        scale: 0.75 + Math.random() * 0.6,
+        rotY: Math.random() * Math.PI * 2,
+        tilt: (Math.random() - 0.5) * 0.22,
+        colorHex: FLOWER_HEAD_COLORS[Math.floor(Math.random() * FLOWER_HEAD_COLORS.length)],
+        isStar: Math.random() < 0.4,
+      });
+    }
+  }
+  if (allFlowers.length === 0) return;
+
+  const roundFlowers = allFlowers.filter((f) => !f.isStar);
+  const starFlowers = allFlowers.filter((f) => f.isStar);
+
+  const stems = new THREE.InstancedMesh(stemGeo, stemMat, allFlowers.length);
+  const roundHeads = new THREE.InstancedMesh(roundHeadGeo, roundHeadMat, roundFlowers.length);
+  const starHeads = new THREE.InstancedMesh(starHeadGeo, starHeadMat, starFlowers.length);
+  [stems, roundHeads, starHeads].forEach((m) => { m.castShadow = true; m.receiveShadow = true; });
+
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+
+  allFlowers.forEach((f, i) => {
+    dummy.position.set(f.x, (f.stemH * f.scale) / 2, f.z);
+    dummy.rotation.set(f.tilt, f.rotY, f.tilt);
+    dummy.scale.set(f.scale, f.stemH * f.scale, f.scale);
+    dummy.updateMatrix();
+    stems.setMatrixAt(i, dummy.matrix);
+  });
+
+  function placeHeads(mesh, list) {
+    list.forEach((f, i) => {
+      dummy.position.set(f.x, f.stemH * f.scale, f.z);
+      dummy.rotation.set(f.tilt, f.rotY, f.tilt);
+      dummy.scale.setScalar(f.scale);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      color.setHex(f.colorHex);
+      mesh.setColorAt(i, color);
+    });
+    // instanceColor baru dibuat THREE.js begitu setColorAt pertama kali
+    // dipanggil — kalau list kosong (kasus ekstrem: semua bunga kebetulan
+    // jenis lain), instanceColor tetap null, jadi dijaga di sini supaya
+    // tidak pernah melempar error saat load.
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
+  placeHeads(roundHeads, roundFlowers);
+  placeHeads(starHeads, starFlowers);
+
+  stems.instanceMatrix.needsUpdate = true;
+  roundHeads.instanceMatrix.needsUpdate = true;
+  starHeads.instanceMatrix.needsUpdate = true;
+
+  scene.add(stems, roundHeads, starHeads);
+}
+
+// =====================================================================
 // SECTION 7B — SUARA (Web Audio API, disintesis — tanpa file audio eksternal)
 // =====================================================================
 
@@ -1908,144 +2167,191 @@ function triggerCakeIntro() {
 function buildCar() {
   const group = new THREE.Group();
 
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff8fb8, roughness: 0.35, metalness: 0.3, envMapIntensity: 0.55 });
+  // --- Warna & material utama: hijau mint/teal ala mobil retro mungil di
+  // foto referensi, bodi mengkilap dengan aksen krom di mana-mana. ---
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3fcdb6, roughness: 0.3, metalness: 0.35, envMapIntensity: 0.6 });
   if (carEnvMap) bodyMat.envMap = carEnvMap; // refleksi lembut, HANYA di bodi mobil (lihat Log Keputusan Desain)
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe8ecf0, roughness: 0.2, metalness: 0.85 });
+
   const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 4.2), bodyMat);
   body.position.y = 0.75;
   body.castShadow = true;
   body.receiveShadow = true;
   group.add(body);
 
-  // rocker panel dua-warna (lebih gelap) di bawah bodi — kesan mobil
-  // sungguhan yang biasanya punya aksen warna beda di bagian bawah
-  const rockerMat = new THREE.MeshStandardMaterial({ color: 0xcf6f96, roughness: 0.55, metalness: 0.15 });
-  const rocker = new THREE.Mesh(new THREE.BoxGeometry(2.64, 0.22, 4.24), rockerMat);
-  rocker.position.set(0, 0.3, 0);
+  // spatbor bulat menonjol di keempat roda — kesan mobil retro yang
+  // gembul/membulat, bukan kotak lurus
+  const fenderGeo = new THREE.SphereGeometry(0.58, 12, 10);
+  [[-1.25, -1.3], [1.25, -1.3], [-1.25, 1.3], [1.25, 1.3]].forEach(([fx, fz]) => {
+    const fender = new THREE.Mesh(fenderGeo, bodyMat);
+    fender.position.set(fx, 0.62, fz);
+    fender.scale.set(0.62, 0.85, 0.95);
+    fender.castShadow = true;
+    group.add(fender);
+  });
+
+  // rocker panel krom tipis di bawah bodi (bukan lagi warna gelap solid)
+  const rocker = new THREE.Mesh(new THREE.BoxGeometry(2.62, 0.14, 4.22), chromeMat);
+  rocker.position.set(0, 0.24, 0);
   rocker.castShadow = true;
   group.add(rocker);
 
-  // garis sambungan pintu (door seam) + gagang pintu, biar tidak terlihat
-  // seperti satu balok polos tanpa detail
-  const seamMat = new THREE.MeshStandardMaterial({ color: 0xcf6f96, roughness: 0.6 });
-  const handleMat = new THREE.MeshStandardMaterial({ color: 0xf3eef7, roughness: 0.3, metalness: 0.4 });
+  // garis sambungan pintu tipis + gagang pintu krom kecil
+  const seamMat = new THREE.MeshStandardMaterial({ color: 0x2f9f8c, roughness: 0.5 });
   [-1, 1].forEach((side) => {
     const seam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.65, 0.03), seamMat);
     seam.position.set(1.31 * side, 0.85, 0.35);
     group.add(seam);
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.35), handleMat);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.3), chromeMat);
     handle.position.set(1.32 * side, 1.02, -0.35);
     group.add(handle);
   });
 
-  // grille depan gelap
-  const grilleMat = new THREE.MeshStandardMaterial({ color: 0x3a2f38, roughness: 0.7 });
-  const grille = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.28, 0.06), grilleMat);
-  grille.position.set(0, 0.6, -2.09);
-  group.add(grille);
+  // --- Ventilasi/louver samping di spatbor depan, ala mobil retro di foto ---
+  [-1, 1].forEach((side) => {
+    for (let i = 0; i < 3; i++) {
+      const louver = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.36, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x2a2f33, roughness: 0.6, metalness: 0.3 }));
+      louver.position.set(1.31 * side, 0.85, -1.55 + i * 0.14);
+      group.add(louver);
+    }
+  });
 
   // plat nomor depan & belakang
   const plateMat = new THREE.MeshStandardMaterial({ color: 0xfdfdf6, roughness: 0.5 });
-  const platePos = [[-2.09, "front"], [2.09, "back"]];
-  platePos.forEach(([z]) => {
+  [-2.1, 2.1].forEach((z) => {
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.03), plateMat);
     plate.position.set(0, 0.42, z);
     group.add(plate);
   });
 
   // pipa knalpot kecil di belakang
-  const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x8a8290, roughness: 0.4, metalness: 0.6 });
-  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.3, 10), exhaustMat);
+  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.3, 10), chromeMat);
   exhaust.rotation.z = Math.PI / 2;
   exhaust.position.set(0.7, 0.32, 2.2);
   group.add(exhaust);
 
-  // bumper depan & belakang membulat tipis (menggantikan tabung sudut
-  // sebelumnya yang terlihat seperti gumpalan/pontoon pink besar)
-  const bumperGeo = new THREE.CylinderGeometry(0.22, 0.22, 2.5, 12);
-  const frontBumper = new THREE.Mesh(bumperGeo, bodyMat);
+  // bumper depan & belakang KROM (bukan warna bodi lagi) — melengkung
+  // tipis membungkus ujung mobil, khas mobil retro di foto referensi
+  const bumperGeo = new THREE.CylinderGeometry(0.16, 0.16, 2.55, 12);
+  const frontBumper = new THREE.Mesh(bumperGeo, chromeMat);
   frontBumper.rotation.z = Math.PI / 2;
-  frontBumper.position.set(0, 0.42, -2.05);
+  frontBumper.position.set(0, 0.4, -2.08);
   frontBumper.castShadow = true;
   group.add(frontBumper);
   const rearBumper = frontBumper.clone();
-  rearBumper.position.z = 2.05;
+  rearBumper.position.z = 2.08;
   group.add(rearBumper);
+  // sirip kecil ujung bumper menekuk ke belakang (ciri khas bumper retro)
+  [-1, 1].forEach((side) => {
+    [-2.08, 2.08].forEach((bz) => {
+      const wrap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.4), chromeMat);
+      wrap.position.set(1.28 * side, 0.4, bz + (bz < 0 ? 0.18 : -0.18));
+      group.add(wrap);
+    });
+  });
 
-  // atap membulat (setengah silinder, bukan kotak) untuk kesan bodi mobil
-  // yang lebih halus/realistis, bukan kotak tumpul
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.2, envMapIntensity: 0.4 });
-  if (carEnvMap) roofMat.envMap = carEnvMap;
-  const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 2.3, 16, 1, false, 0, Math.PI), roofMat);
+  // atap membulat tinggi (kaca besar di sekeliling, kesan "bubble car")
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.08, 2.5, 16, 1, false, 0, Math.PI), bodyMat);
   roof.rotation.z = Math.PI / 2;
   roof.rotation.y = Math.PI / 2;
-  roof.scale.set(1, 0.72, 1);
-  roof.position.set(0, 1.2, -0.1);
+  roof.scale.set(1, 0.8, 1);
+  roof.position.set(0, 1.18, -0.05);
   roof.castShadow = true;
   group.add(roof);
+  // list krom tipis sepanjang tepi bawah atap
+  const roofTrim = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.03, 6, 16, Math.PI), chromeMat);
+  roofTrim.rotation.z = Math.PI / 2;
+  roofTrim.rotation.y = Math.PI / 2;
+  roofTrim.scale.set(1, 0.8, 1);
+  roofTrim.position.set(0, 1.18, -0.05);
+  group.add(roofTrim);
 
-  // jendela (kaca depan, belakang, samping) — kontras gelap supaya bodi
-  // mobil tidak terlihat sebagai satu blok datar
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x5a4a6e, roughness: 0.25, metalness: 0.1 });
-  const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.62), glassMat);
-  windshield.position.set(0, 1.5, -1.16);
-  windshield.rotation.x = -0.35;
+  // jendela kaca besar (depan, belakang, samping) — bening kebiruan pucat,
+  // dibingkai list krom tipis
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfe4ea, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.75 });
+  const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.85, 0.68), glassMat);
+  windshield.position.set(0, 1.48, -1.18);
+  windshield.rotation.x = -0.32;
   group.add(windshield);
   const rearWindow = windshield.clone();
-  rearWindow.position.z = 0.98;
-  rearWindow.rotation.x = 0.35;
+  rearWindow.position.z = 0.92;
+  rearWindow.rotation.x = 0.32;
   group.add(rearWindow);
   [-1, 1].forEach((side) => {
-    const sideWindow = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.55), glassMat);
-    sideWindow.position.set(1.06 * side, 1.5, -0.1);
+    const sideWindow = new THREE.Mesh(new THREE.PlaneGeometry(1.95, 0.6), glassMat);
+    sideWindow.position.set(1.07 * side, 1.48, -0.13);
     sideWindow.rotation.y = Math.PI / 2;
     group.add(sideWindow);
   });
 
-  // garis racing stripe tengah
-  const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 4.25), stripeMat);
-  stripe.position.set(0, 1.26, 0);
-  group.add(stripe);
+  // --- Jok/interior coklat tan terlihat sekilas dari balik kaca ---
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x9a6a42, roughness: 0.7 });
+  const seatBack = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.55, 0.14), seatMat);
+  seatBack.position.set(0, 1.15, -0.55);
+  group.add(seatBack);
+  const seatBase = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.7), seatMat);
+  seatBase.position.set(0, 0.92, -0.2);
+  group.add(seatBase);
+  // setir kecil
+  const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 6, 12),
+    new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.6 }));
+  wheelRing.position.set(-0.5, 1.1, -0.95);
+  wheelRing.rotation.x = Math.PI / 2.3;
+  group.add(wheelRing);
 
-  // spion
-  const mirrorMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+  // spion bulat krom di tiang tipis, ala foto referensi
   [-1, 1].forEach((side) => {
-    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.25, 0.4), mirrorMat);
-    mirror.position.set(1.4 * side, 1.15, 0.9);
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 6), chromeMat);
+    stalk.position.set(1.32 * side, 1.32, 0.75);
+    stalk.rotation.z = side * 0.5;
+    group.add(stalk);
+    const mirror = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), chromeMat);
+    mirror.position.set(1.42 * side, 1.4, 0.75);
+    mirror.scale.set(1, 1, 0.55);
     group.add(mirror);
   });
 
-  // lampu belakang bulat
-  const tailMat = new THREE.MeshStandardMaterial({ color: 0xff4d6d, emissive: 0xff4d6d, emissiveIntensity: 0.6 });
+  // lampu belakang bulat merah, dibingkai krom
   [-1, 1].forEach((side) => {
-    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), tailMat);
-    tail.position.set(0.9 * side, 0.85, 2.05);
+    const tailRing = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 8, 14), chromeMat);
+    tailRing.position.set(0.92 * side, 0.85, 2.08);
+    group.add(tailRing);
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0xff4d4d, emissiveIntensity: 0.6 }));
+    tail.position.set(0.92 * side, 0.85, 2.1);
     group.add(tail);
   });
 
-  // lampu depan
-  const headMat = new THREE.MeshStandardMaterial({ color: 0xfffbe8, emissive: 0xfff2a8, emissiveIntensity: 0.5 });
+  // --- Lampu depan bulat besar menonjol dibingkai krom, khas mobil retro ---
   [-1, 1].forEach((side) => {
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), headMat);
-    head.position.set(0.9 * side, 0.85, -2.05);
+    const headRing = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 8, 16), chromeMat);
+    headRing.position.set(0.85 * side, 0.9, -2.1);
+    group.add(headRing);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0xfffbe8, emissive: 0xfff2a8, emissiveIntensity: 0.5 }));
+    head.position.set(0.85 * side, 0.9, -2.12);
     group.add(head);
+    // lampu sein bulat kecil oranye di bawah lampu utama
+    const indicator = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0xff9d3d, emissive: 0xff8a1f, emissiveIntensity: 0.5 }));
+    indicator.position.set(0.85 * side, 0.6, -2.1);
+    group.add(indicator);
   });
 
-  // roda — diperbesar & digeser lebih keluar supaya jelas terlihat menonjol
-  // dari sisi bodi, bukan tersembunyi rapat di dalam siluet bodi
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x2e2530, roughness: 0.9 });
-  const wheelGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.34, 14);
-  const hubMat = new THREE.MeshStandardMaterial({ color: 0xdcd0e0, roughness: 0.5, metalness: 0.3 });
-  const hubGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.36, 10);
-  [[-1.42, -1.35], [1.42, -1.35], [-1.42, 1.35], [1.42, 1.35]].forEach(([x, z]) => {
+  // roda — ban hitam + hubcap krom bundar, spatbor sudah menaungi dari atas
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f1b1f, roughness: 0.9 });
+  const wheelGeo = new THREE.CylinderGeometry(0.46, 0.46, 0.34, 14);
+  const hubGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.36, 12);
+  [[-1.25, -1.3], [1.25, -1.3], [-1.25, 1.3], [1.25, 1.3]].forEach(([x, z]) => {
     const wheel = new THREE.Mesh(wheelGeo, wheelMat);
     wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(x, 0.48, z);
+    wheel.position.set(x, 0.46, z);
     wheel.castShadow = true;
     group.add(wheel);
-    const hub = new THREE.Mesh(hubGeo, hubMat);
+    const hub = new THREE.Mesh(hubGeo, chromeMat);
     hub.rotation.z = Math.PI / 2;
-    hub.position.set(x + (x > 0 ? 0.01 : -0.01), 0.48, z);
+    hub.position.set(x + (x > 0 ? 0.01 : -0.01), 0.46, z);
     group.add(hub);
   });
 
@@ -2129,8 +2435,14 @@ function resolveCollisions(nx, nz) {
 function updatePhysics(dt) {
   if (!unlocked) return;
 
-  if (keys.forward) carState.speed += carState.accel * dt;
-  else if (keys.backward) carState.speed -= carState.accel * dt;
+  // throttleAxis/turnDir: -1..1. Dari keyboard nilainya selalu -1/0/1
+  // (persis perilaku lama, tidak berubah). Dari joystick analog mobile
+  // nilainya kontinu (lihat getThrottleAxis()/getSteerAxis(), SECTION 13)
+  // — makanya dikalikan langsung (bukan if/else on-off) supaya gas &
+  // belokan analog beneran terasa proporsional saat disentuh.
+  const throttleAxis = getThrottleAxis();
+  if (throttleAxis > 0.04) carState.speed += carState.accel * dt * throttleAxis;
+  else if (throttleAxis < -0.04) carState.speed += carState.accel * dt * throttleAxis; // throttleAxis negatif -> speed otomatis berkurang, sebanding besarnya
   else {
     if (carState.speed > 0) carState.speed = Math.max(0, carState.speed - carState.decel * dt);
     else carState.speed = Math.min(0, carState.speed + carState.decel * dt);
@@ -2138,7 +2450,7 @@ function updatePhysics(dt) {
   carState.speed = Math.max(carState.maxReverse, Math.min(carState.maxSpeed, carState.speed));
 
   const speedRatio = Math.max(0.2, Math.abs(carState.speed) / carState.maxSpeed);
-  const turnDir = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
+  const turnDir = getSteerAxis();
   const turnSign = carState.speed >= 0 ? 1 : -1;
   if (Math.abs(carState.speed) > 0.05) {
     carState.heading += turnDir * carState.turnRate * speedRatio * turnSign * dt;
@@ -2255,8 +2567,100 @@ function updateHUD() {
 }
 
 // =====================================================================
-// SECTION 13 — INPUT (KEYBOARD + D-PAD TOUCH)
+// SECTION 13 — INPUT (KEYBOARD + JOYSTICK ANALOG TOUCH)
 // =====================================================================
+// Kontrol mobile (perangkat sentuh tanpa keyboard fisik, dideteksi lewat
+// media query `pointer: coarse`) sebelumnya berupa D-pad 4 tombol —
+// kemudinya digital, cuma kiri/kanan penuh atau tidak sama sekali.
+// Diganti jadi satu joystick analog virtual (`#joystick`, lihat
+// style.css & index.html): sumbu X knob = kemudi (besar-kecilnya
+// belokan sebanding seberapa jauh knob ditarik dari tengah, bukan cuma
+// on/off), sumbu Y knob = gas/mundur (analog juga sekalian, konsisten).
+// Keyboard (panah/WASD) SENGAJA tidak diubah sama sekali — tetap digital
+// lewat `keys` seperti semula, supaya tidak ada risiko regresi di
+// kontrol desktop. `updatePhysics()` (SECTION 10) membaca axis lewat
+// `getThrottleAxis()`/`getSteerAxis()` di bawah, yang mengutamakan
+// joystick kalau sedang aktif disentuh, else jatuh balik ke `keys` —
+// jadi dua sumber input (analog & digital) hidup berdampingan tanpa
+// saling konflik. Lihat Log Keputusan Desain di README.md.
+
+// steerRaw/throttleRaw: -1..1, nol lagi begitu knob dilepas.
+const joystick = { active: false, steerRaw: 0, throttleRaw: 0 };
+
+function getThrottleAxis() {
+  return joystick.active ? joystick.throttleRaw : ((keys.forward ? 1 : 0) - (keys.backward ? 1 : 0));
+}
+function getSteerAxis() {
+  // Tanda dibalik: menarik knob ke KANAN (steerRaw positif) harus
+  // membelokkan mobil ke KANAN — sama seperti dulu dpad-right
+  // menghasilkan turnDir negatif di updatePhysics (lihat konvensi
+  // `keys.left ? 1 : 0) - (keys.right ? 1 : 0)` di bawah).
+  return joystick.active ? -joystick.steerRaw : ((keys.left ? 1 : 0) - (keys.right ? 1 : 0));
+}
+
+function initJoystick() {
+  const base = document.getElementById("joystick-base");
+  const knob = document.getElementById("joystick-knob");
+  if (!base || !knob) return; // markup cuma ada utk mobile; dijaga aman kalau suatu saat dihapus
+
+  const MAX_RADIUS = 44; // px, radius geser maksimum knob dari pusat base (base 130px di CSS, jadi ada sisa margin visual di tepi)
+  let activePointerId = null;
+  let baseRect = null;
+
+  function setKnobVisual(dx, dy) {
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+
+  function updateFromPointer(clientX, clientY) {
+    const cx = baseRect.left + baseRect.width / 2;
+    const cy = baseRect.top + baseRect.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_RADIUS) {
+      const scale = MAX_RADIUS / dist;
+      dx *= scale;
+      dy *= scale;
+    }
+    setKnobVisual(dx, dy);
+    joystick.steerRaw = dx / MAX_RADIUS;      // -1 (mentok kiri) .. +1 (mentok kanan)
+    joystick.throttleRaw = -dy / MAX_RADIUS;  // sumbu Y layar positif ke bawah, dibalik: geser ke ATAS = maju (+1)
+  }
+
+  function resetJoystick() {
+    joystick.active = false;
+    joystick.steerRaw = 0;
+    joystick.throttleRaw = 0;
+    setKnobVisual(0, 0);
+  }
+
+  // Pointer Events (bukan touch/mouse terpisah spt D-pad lama) dipilih
+  // sengaja: satu set listener otomatis menangani sentuhan di HP MAUPUN
+  // drag mouse (misal saat dites lewat device-toolbar desktop browser),
+  // dan `setPointerCapture` menjamin drag tetap terlacak walau jari
+  // meleset keluar dari lingkaran base — penting utk kontrol joystick,
+  // beda dgn tombol dpad lama yang cukup event per-tombol saja.
+  base.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    activePointerId = e.pointerId;
+    baseRect = base.getBoundingClientRect();
+    joystick.active = true;
+    base.setPointerCapture(activePointerId);
+    updateFromPointer(e.clientX, e.clientY);
+  });
+  base.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    updateFromPointer(e.clientX, e.clientY);
+  });
+  const endHandler = (e) => {
+    if (e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    resetJoystick();
+  };
+  base.addEventListener("pointerup", endHandler);
+  base.addEventListener("pointercancel", endHandler);
+}
 
 function initInput() {
   window.addEventListener("keydown", (e) => {
@@ -2277,20 +2681,7 @@ function initInput() {
     }
   });
 
-  const bindHold = (id, key) => {
-    const el = document.getElementById(id);
-    const set = (v) => (e) => { e.preventDefault(); keys[key] = v; };
-    el.addEventListener("touchstart", set(true), { passive: false });
-    el.addEventListener("touchend", set(false), { passive: false });
-    el.addEventListener("touchcancel", set(false), { passive: false });
-    el.addEventListener("mousedown", set(true));
-    el.addEventListener("mouseup", set(false));
-    el.addEventListener("mouseleave", set(false));
-  };
-  bindHold("dpad-up", "forward");
-  bindHold("dpad-down", "backward");
-  bindHold("dpad-left", "left");
-  bindHold("dpad-right", "right");
+  initJoystick();
 
   document.getElementById("cam-btn").addEventListener("click", cycleCamPreset);
 
@@ -2523,6 +2914,12 @@ function animate() {
 // =====================================================================
 
 function populateBirthdayLetter() {
+  // Judul surat diisi dari BIRTHDAY_PERSON_NAME (bukan hardcode di HTML)
+  // supaya konten tetap terpusat di satu tempat (SECTION 0), konsisten
+  // dgn kenapa BIRTHDAY_LETTER_LINES sendiri sudah dipisah dari markup.
+  const title = document.getElementById("birthday-title");
+  if (title) title.textContent = `Selamat Ulang Tahun, ${BIRTHDAY_PERSON_NAME}! 💕`;
+
   const body = document.getElementById("birthday-letter-body");
   body.innerHTML = "";
   BIRTHDAY_LETTER_LINES.forEach((line) => {
@@ -2553,6 +2950,7 @@ function init() {
   buildCityPeople();
   buildCityClowns();
   buildCityAnimals();
+  buildFlowerFields();
   buildClouds();
   buildBirds();
 

@@ -16,7 +16,7 @@ server apa pun.
 
 ```
 kota-kenangan/
-├── index.html          # markup: lock-screen, canvas WebGL, D-pad, cake-intro,
+├── index.html          # markup: lock-screen, canvas WebGL, joystick analog, cake-intro,
 │                          layar surat ulang tahun + <script> CDN Three.js
 │                          (non-module, versi dipin) + <script src="script.js">
 ├── style.css            # semua styling & tema visual "cute pastel"
@@ -44,11 +44,14 @@ tiap bagian logic secara jelas:
 7B. Suara (Web Audio API, disintesis — tanpa file audio eksternal)
 8. Titik FINISH (koordinat trigger surat ulang tahun) + monumen ulang tahun + kembang api
 8D. Monumen foto di luar lintasan (satu per file foto di assets/photos/)
+8F. Hamparan bunga yang membentuk tulisan "SELAMAT ULANG TAHUN SAYANG"
+    (`buildFlowerFields()`, font bitmap 5x7 `FLOWER_FONT_5X7`,
+    InstancedMesh, tanpa collider — lihat Log Keputusan Desain)
 9. Mobil (gaya Mini Cooper, geometry primitif)
 10. Fisika & collision (2D top-down) + koridor rute (`applyRouteLock`)
 11. Kamera chase cam
 12. HUD
-13. Input (keyboard + D-pad touch)
+13. Input (keyboard digital + joystick analog touch, `getThrottleAxis()`/`getSteerAxis()`)
 14. Layar kunci password
 15. Loop utama (`animate`)
 16. Bootstrap (`init`)
@@ -121,13 +124,27 @@ Scene 3D tetap dirender di belakang overlay translusen. Password & hint adalah
 konstanta (`LOCK_PASSWORD`, `LOCK_HINT`) di bagian atas `script.js`, siap
 diganti user.
 
+### Nama yang berulang tahun
+Konstanta `BIRTHDAY_PERSON_NAME` (SECTION 0, `script.js`) menyimpan nama
+orang yang ulang tahun — saat ini **Gabriela Oktaviany Sihaloho**. Dipakai
+di dua tempat lewat `populateBirthdayLetter()`: judul surat
+(`#birthday-title`, "Selamat Ulang Tahun, {nama}!") dan baris pembuka
+`BIRTHDAY_LETTER_LINES[0]` ("Happy Birthday, {nama}! 🎉"), jadi kalau nama
+diganti di satu tempat itu, otomatis konsisten di judul & isi surat.
+`<title>` di `index.html` juga disebut "untuk Gabriela" sebagai penanda
+cepat di tab browser. Lihat Log Keputusan Desain.
+
 ## Cara Pakai
 
 1. Buka `index.html` langsung (dobel-klik dari file explorer, atau drag ke
    browser).
 2. Password sudah diisi (`27012026`, hint "sandi hp android kamuuu 🫵") —
    ganti `LOCK_PASSWORD`/`LOCK_HINT` di awal `script.js` kalau mau diubah.
-3. Kontrol: panah/WASD (desktop), D-pad on-screen (mobile/sentuh), tombol
+   Nama yang berulang tahun ada di `BIRTHDAY_PERSON_NAME` (lihat bagian
+   "Nama yang berulang tahun" di atas).
+3. Kontrol: panah/WASD (desktop), joystick analog on-screen (mobile/sentuh
+   — geser knob-nya ke arah mana pun, gas & belok mengikuti sebesar
+   geserannya), tombol
    `🎥`/`C` untuk ganti jarak chase cam (Dekat/Sedang/Jauh).
 4. Di awal permainan mobil dipandu lewat koridor sirkuit menuju FINISH di
    monumen ulang tahun; sepanjang jalan akan melewati gapura-gapura foto
@@ -142,6 +159,190 @@ diganti user.
 ---
 
 ## Log Keputusan Desain
+
+### 2026-09-21 — Kontrol mobile diganti dari D-pad (digital) jadi joystick analog
+Permintaan user: kontroler kemudi di tampilan mobile (perangkat tanpa
+keyboard fisik) diganti jadi analog. Sebelumnya kontrol sentuh berupa
+D-pad 4 tombol (`#dpad`/`.dpad-btn`) yang murni digital — tiap tombol
+cuma set `keys.forward/backward/left/right` ke `true`/`false`, jadi
+belok/gas selalu penuh atau nol sama sekali, tidak ada nuansa di antara.
+
+Diganti dengan satu **joystick analog virtual** (`#joystick` →
+`#joystick-base` + `#joystick-knob`, style baru di `style.css`, media
+query `@media (pointer: coarse)` yang sama dgn D-pad lama supaya tetap
+cuma muncul di perangkat sentuh). Sumbu X knob jadi kemudi, sumbu Y knob
+jadi gas/mundur, keduanya kontinu `-1..1` sebanding jarak knob ditarik
+dari pusat (dijepit ke radius maksimum `MAX_RADIUS = 44px` kalau jari
+ditarik lebih jauh dari itu).
+
+Keputusan desain kunci — **keyboard TIDAK ikut diubah sama sekali**:
+`keys.forward/backward/left/right` beserta listener `keydown`/`keyup`
+dibiarkan persis seperti semula (tetap digital), supaya nol risiko
+regresi di kontrol desktop yang sudah stabil. Sebagai gantinya,
+`updatePhysics()` (SECTION 10) tidak lagi baca `keys` langsung, tapi
+lewat dua fungsi baru `getThrottleAxis()`/`getSteerAxis()` (SECTION 13)
+yang mengutamakan nilai joystick kalau `joystick.active` true, else jatuh
+balik hitung dari `keys` seperti logic lama (`(keys.left?1:0) -
+(keys.right?1:0)`, dst) — jadi input digital (keyboard) & analog
+(joystick) hidup berdampingan lewat satu titik baca yang sama tanpa
+saling konflik, dan `updatePhysics` sendiri cuma perlu diubah dari
+if/else on-off jadi perkalian langsung dgn axis (`carState.speed +=
+carState.accel * dt * throttleAxis`) supaya jalan analog beneran
+proporsional saat dari joystick, tapi hasilnya identik dgn perilaku lama
+saat axis-nya kebetulan cuma -1/0/1 (dari keyboard).
+
+Drag joystick ditangani pakai **Pointer Events** (`pointerdown`/
+`pointermove`/`pointerup`/`pointercancel` + `setPointerCapture`) alih-
+alih pasangan `touchstart`/`touchend` + `mousedown`/`mouseup` terpisah
+seperti D-pad lama — satu set listener otomatis menangani sentuhan HP
+maupun drag mouse (berguna saat tes lewat device-toolbar desktop
+browser), dan `setPointerCapture` menjamin drag tetap terlacak walau
+jari meleset keluar lingkaran `#joystick-base` saat ditarik jauh
+(penting utk kontrol joystick — beda dgn tombol D-pad lama yang cukup
+event per-tombol, tanpa perlu drag-tracking sama sekali). `#joystick-knob`
+diberi `pointer-events: none` supaya listener yang dipasang di
+`#joystick-base` tetap menerima event walau jari menyentuh knob (bukan
+area base) secara visual.
+
+### 2026-09-21 — Konteks nama yang ulang tahun ditambahkan (`BIRTHDAY_PERSON_NAME`)
+Permintaan user: tambahkan konteks bahwa nama yang berulang tahun adalah
+**Gabriela Oktaviany Sihaloho**. Sebelumnya proyek ini sama sekali tidak
+menyimpan nama — surat & judul cuma pakai sapaan generik "sayang".
+Ditambahkan satu konstanta baru `BIRTHDAY_PERSON_NAME` di SECTION 0
+(dekat `LOCK_PASSWORD`/`BIRTHDAY_LETTER_LINES`, mengikuti pola "konten
+sebagai konstanta yang gampang diganti" yang sudah dipakai di seluruh
+proyek), lalu dipakai di dua tempat: baris pembuka
+`BIRTHDAY_LETTER_LINES[0]` (template string, bukan hardcode ulang) dan
+judul surat `#birthday-title` — yang terakhir ini sebelumnya teks statis
+langsung di `index.html`, sekarang diisi dinamis lewat
+`populateBirthdayLetter()` supaya kontennya tetap terpusat di satu tempat
+(`script.js`), konsisten dengan alasan `BIRTHDAY_LETTER_LINES` sendiri
+sudah dipisah dari markup (lihat entri log 2026-07-31 "surat lucu" di
+bawah). `<title>` di `index.html` juga disesuaikan jadi "...— untuk
+Gabriela" sebagai penanda cepat di tab browser, cukup nama depan supaya
+tab title tidak kepanjangan.
+
+### 2026-09-21 — Hamparan bunga diubah dari sebaran acak jadi membentuk tulisan "SELAMAT ULANG TAHUN SAYANG"
+Permintaan user lanjutan setelah fitur hamparan bunga (entri log di bawah
+ini) sudah ada: bunga-bunganya diubah supaya BENTUK hamparannya sendiri
+membentuk tulisan "Selamat Ulang Tahun Sayang", bukan cuma tersebar acak
+dalam petak bundar. Ditambahkan `FLOWER_FONT_5X7` — font bitmap 5x7 piksel
+buatan sendiri (bukan font/model eksternal, konsisten dengan batasan
+proyek "semua objek dari geometry primitif" yang sama dipakai tanda huruf
+3D landmark, entri log 2026-07-31) — hanya berisi 11 huruf yang benar-benar
+dipakai (S, E, L, A, M, T, U, N, G, H, Y).
+
+Teks disusun 3 baris ("SELAMAT" / "ULANG TAHUN" / "SAYANG",
+`FLOWER_TEXT_LINES`) alih-alih 1 baris panjang — satu baris "SELAMAT ULANG
+TAHUN SAYANG" penuh akan menghasilkan kotak tulisan terlalu lebar (>250
+unit), butuh radius pencarian titik jangkar yang sangat besar lewat
+`findClearRandomSpot()` sehingga jarang/sulit menemukan area kosong yang
+cukup luas di dunia (`WORLD_HALF = 320`); 3 baris menekan lebar kotak
+tulisan ke ~100 unit (radius pencarian ~61 unit, sudah termasuk margin) —
+jauh lebih realistis ketemu tempat kosong.
+
+`layoutFlowerTextGrid()` mengubah tiap baris jadi grid sel "menyala/mati"
+(memakai lebar baris terlebar sebagai acuan supaya baris yang lebih
+pendek otomatis dipusatkan), lalu `buildFlowerTextPositions()` mengubah
+tiap sel yang menyala jadi satu bunga individual di koordinat dunia
+(dengan jitter kecil `±0.28` sel supaya tetap terasa "kebun bunga asli",
+bukan grid piksel kaku), dan `findClearRandomSpot()` dipanggil dengan
+radius = setengah diagonal kotak tulisan + margin (bukan cuma radius
+kecil seperti petak lama) supaya SELURUH kotak tulisan terjamin bebas
+dari lintasan/air/bangunan, bukan cuma titik tengahnya. Kalau pencarian
+pertama gagal (dunia kebetulan padat), dicoba ulang sekali lagi dengan
+radius diperkecil (70%) — kalau tetap gagal, tulisan cukup dilewati tanpa
+error, petak aksen di bawah tetap jalan seperti biasa (graceful fallback,
+bukan crash).
+
+Jumlah petak bunga ACAK di luar tulisan dikurangi dari 6 jadi 3
+(`FLOWER_ACCENT_PATCH_COUNT`, sebelumnya `FLOWER_PATCH_COUNT`) karena
+tulisan sekarang jadi fokus visual utama hamparan bunga — 6 petak acak +
+tulisan penuh dinilai bakal membuat area sekitar tulisan terlalu ramai
+dan mengaburkan keterbacaan tulisannya sendiri. Warna kepala bunga di
+tulisan memakai palet baru `FLOWER_TEXT_HEAD_COLORS` (didominasi pink &
+putih) alih-alih palet 7 warna penuh punya petak acak, supaya kontras &
+keterbacaan bentuk hurufnya lebih tinggi dari jarak jauh/saat berkendara.
+Render tetap lewat 3 `InstancedMesh` yang sama seperti sebelumnya (batang,
+kepala bulat, kepala bintang) — tulisan sebesar apa pun (363 bunga untuk
+teks lengkap) tetap cuma nambah jumlah instance, bukan draw call baru.
+
+### 2026-09-21 — Hamparan bunga ditambahkan di area-area kosong dunia
+Permintaan user: isi area yang masih kosong di dunia dengan hamparan
+bunga. Ditambahkan SECTION 8F baru (`buildFlowerFields()`, konstanta
+`FLOWER_*`) — 6 "petak" bunga disebar lewat `findClearRandomSpot()`,
+konvensi yang sama dipakai `buildBigBuildings`/`buildTugus`/
+`buildCuteStatues`/dsb di atas, jadi otomatis menghindari lintasan, air,
+& bangunan/dekorasi lain tanpa logic baru. Tiap petak berisi 70-110 bunga
+individual (batang hijau + kepala bulat ATAU kepala segi bentuk bintang,
+warna acak dari palet pastel), tersebar merata dalam lingkaran radius 8
+unit di sekitar titik petak (pakai distribusi `sqrt(random())` supaya
+rata per luas, bukan menumpuk di tengah).
+
+Radius petak (8 unit) sengaja dijaga di bawah jarak aman minimum yang
+dijamin `findClearRandomSpot` terhadap lintasan (>=16 unit dari titik ke
+as jalan, terlepas dari parameter margin yang dikirim — lihat kode
+`findClearRandomSpot` di SECTION 3) dikurangi `TRACK_HALF_WIDTH` (7),
+supaya bunga di tepi petak yang paling dekat lintasan pun dijamin
+matematis tidak pernah menembus aspal, bukan cuma "biasanya aman".
+
+Performa: SEMUA bunga di SEMUA petak (bisa ratusan) dirender lewat cuma 3
+`InstancedMesh` (satu utk batang, satu utk kepala bulat, satu utk kepala
+bintang) — bukan `THREE.Group` per bunga seperti NPC/hewan di atas —
+supaya cuma 1 draw call per jenis bagian, persis pendekatan yang sudah
+dipakai `buildBoundaryWalls()` utk ratusan batu. Warna kepala per-instance
+lewat `InstancedMesh.setColorAt`. Bunga SENGAJA tidak diberi collider
+sama sekali (bunga rumput kecil, bukan penghalang solid) — mobil bebas
+melintasi hamparannya, alasannya sama dengan kenapa pohon latar massal
+dulu tidak diberi collider individual.
+
+### 2026-09-21 — Tulisan "HAPPY BIRTHDAY" di monumen terpotong di kedua ujung — akar masalah ketemu, sekalian diperbaiki di baliho pesawat
+User melaporkan tulisan banner "HAPPY BIRTHDAY" di monumen finish
+terlihat terpotong. Akar masalah: `makeColorfulTextTexture()` mengunci
+font-size mati di 260px tanpa pengecekan lebar sama sekali terhadap
+kanvas 2048px. Diverifikasi dengan mengukur lebar teks sungguhan pakai
+font 'Baloo 2' asli (bukan cuma dugaan dari baca kode): `style.css` cuma
+meng-`@import` weight 500 & 700 dari Google Fonts, padahal kode minta
+`font-weight: 900` — browser sebenarnya jatuh ke wajah 700 (+sintesis
+bold) untuk merender teksnya. Pada weight 700, lebar "HAPPY BIRTHDAY" di
+260px sudah ~2008px, nyaris pas 2048px TANPA sisa margin sama sekali.
+Lebih parah lagi: font 'Baloo 2' dimuat dari jaringan (Google Fonts) —
+kalau `index.html` dibuka offline lewat `file://` (cara pakai utama
+proyek ini, lihat bagian Cara Pakai) atau font-nya telat/gagal dimuat,
+browser diam-diam jatuh ke fallback `sans-serif` bawaan yang JAUH lebih
+lebar (diuji pakai DejaVu Sans Bold sbg pembanding: ~2537px, meluber
+~490px dari kanvas) — skenario yang bikin tulisannya kepotong parah di
+KEDUA ujung, persis yang dilaporkan user.
+
+Diperbaiki dengan utilitas baru `shrinkFontToFit()` (dekat
+`makeBannerTexture`, SECTION 4): mengecilkan font-size bertahap sampai
+lebar teks terukur pasti muat dalam kanvas dengan margin aman (~6-12%),
+berapa pun panjang teksnya & font apa pun yang akhirnya benar-benar
+dipakai browser. Diterapkan ke `makeColorfulTextTexture()` (banner HAPPY
+BIRTHDAY) DAN `makeAirplaneBannerTexture()` (baliho pesawat "Selamat
+Ulang Tahun Sayangku", SECTION 8B2) — yang disebut terakhir ternyata
+punya kelemahan identik (~2101px di font tetap 150px vs kanvas 2048px)
+walau belum sempat dilaporkan user; sekalian diperbaiki dengan fix yang
+sama supaya tidak muncul sebagai bug terpisah nanti. Diverifikasi lewat
+simulasi numerik lebar teks (font Baloo 2 asli & fallback sans-serif,
+sebelum & sesudah perbaikan) — keduanya sekarang pasti muat dengan
+margin aman.
+
+### 2026-08-19 (lanjutan 6) — Mobil diganti gaya "microcar retro" hijau mint sesuai foto referensi user
+`buildCar()` dirombak total mengikuti 3 foto referensi (mobil retro
+mungil hijau mint/teal dengan banyak aksen krom): warna bodi diganti dari
+pink ke hijau mint (`0x3fcdb6`), bumper depan/belakang & rocker panel
+diganti jadi KROM (bukan warna bodi lagi), ditambahkan spatbor bulat
+menonjol di keempat roda (kesan mobil "gembul" retro), ventilasi/louver
+samping di spatbor depan, lampu depan bulat besar menonjol dibingkai
+cincin krom + lampu sein oranye kecil di bawahnya, lampu belakang bulat
+merah dibingkai krom, spion bulat krom di tiang tipis (menggantikan
+spion kotak sebelumnya), list krom di tepi atap, dan interior jok tan/
+coklat + setir kecil yang terlihat sekilas dari balik kaca. Racing stripe
+tengah (gaya Mini Cooper versi sebelumnya) dihapus karena tidak ada di
+referensi. Proporsi/ukuran dasar bodi (2.6×1.0×4.2) sengaja TIDAK diubah
+supaya tetap selaras dengan fisika, koridor lintasan, dan tuning chase
+cam yang sudah ada — cuma tampilan visualnya yang diganti total.
 
 ### 2026-08-19 (lanjutan 5) — Monumen dirombak jadi ISTANA LEBAR, bukan menara tinggi — dan tidak lagi bertumpuk dengan gapura lama
 Permintaan user: monumen jadi gedung megah yang LEBAR (bukan tinggi) dan

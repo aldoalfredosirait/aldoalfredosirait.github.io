@@ -141,36 +141,48 @@ html, body {
 }
 #cam-btn:active { transform: scale(0.95); }
 
-/* ============ D-PAD ============ */
-#dpad {
+/* ============ JOYSTICK ANALOG (mobile/sentuh, tanpa keyboard) ============ */
+/* Menggantikan D-pad 4 tombol lama (kemudi digital on/off) — satu stick
+   analog: geser knob ke kiri/kanan = besar-kecilnya belokan sebanding
+   jarak geser, geser ke atas/bawah = gas/mundur analog juga. Lihat Log
+   Keputusan Desain di README.md. */
+#joystick {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
-  width: 160px;
-  height: 160px;
+  right: 30px;
+  bottom: 30px;
+  width: 130px;
+  height: 130px;
   z-index: 25;
   display: none;
 }
-.dpad-btn {
-  position: absolute;
-  width: 54px;
-  height: 54px;
-  background: rgba(255, 255, 255, 0.8);
+#joystick-base {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
   border: 3px solid var(--pink-deep);
-  border-radius: 16px;
-  font-size: 20px;
-  color: var(--pink-deep);
-  box-shadow: 0 4px 8px var(--shadow);
+  box-shadow: 0 4px 10px var(--shadow);
+  touch-action: none; /* wajib: cegah scroll/zoom halaman ikut ter-trigger saat knob digeser */
   user-select: none;
 }
-.dpad-btn:active { background: var(--pink); transform: scale(0.94); }
-.dpad-up { top: 0; left: 53px; }
-.dpad-down { bottom: 0; left: 53px; }
-.dpad-left { top: 53px; left: 0; }
-.dpad-right { top: 53px; right: 0; }
+#joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px; /* pusatkan knob persis di tengah base */
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 3px solid var(--pink-deep);
+  box-shadow: 0 3px 8px var(--shadow);
+  pointer-events: none; /* drag ditangani #joystick-base, knob cuma visual mengikuti transform */
+  transition: transform 0.05s linear;
+}
 
 @media (pointer: coarse) {
-  #dpad { display: block; }
+  #joystick { display: block; }
 }
 
 /* ============ LOCK SCREEN ============ */
