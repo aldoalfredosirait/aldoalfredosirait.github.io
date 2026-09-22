@@ -2569,9 +2569,10 @@ function buildFlowerFields() {
 //  1) Balon udara (hot air balloon) besar melayang pelan mengelilingi
 //     kota di langit, lapisan visual antara pesawat (kini lebih rendah)
 //     dan awan.
-//  2) Kincir angin (pinwheel) berwarna-warni tersebar di darat, berputar
-//     terus-menerus — gerakan cepat & mencolok dari dekat, kontras dengan
-//     dekorasi statis (tugu, patung, gedung) yang sudah ada.
+//  2) Kincir angin (pinwheel) RAKSASA tersebar di darat (10 menara,
+//     tiang 60-90 unit, jauh melebihi gedung tertinggi) — berputar
+//     terus-menerus, gerakan mencolok terlihat dari jauh, jadi penanda
+//     arah baru di garis langit kota selain awan/pesawat/balon udara.
 //  3) Hujan konfeti ambient: potongan kertas kecil warna-warni jatuh
 //     pelan tersebar di seluruh kota sepanjang waktu (bukan cuma saat
 //     mobil sampai finish seperti SECTION 8C), supaya suasana pesta
@@ -2659,14 +2660,54 @@ function updateHotAirBalloons(elapsed) {
   });
 }
 
-// --- Kincir angin berputar tersebar di darat ---
+// --- Kincir angin RAKSASA berputar tersebar di darat ---
+// Permintaan user: ganti dari kincir kecil (24 buah, tiang ~2.4 unit)
+// jadi versi BESAR "seperti tinggi gunung" dan cuma 10 buah. Diinterpretasi
+// sebagai menara kincir raksasa yang jauh menjulang di atas semua
+// bangunan lain di kota (gedung tertinggi ~28.6, lihat catatan ketinggian
+// pesawat) — bukan literal setinggi gunung sungguhan (tidak proporsional
+// dgn skala dunia WORLD_HALF=320), tapi tetap dibuat dramatis: tinggi
+// tiang 60-90 unit, jauh melampaui gedung, awan rendah, bahkan pesawat
+// baliho (32-56) — jadi dari kejauhan kincir ini akan terlihat menjulang
+// di atas garis langit kota, sesuai kesan "seperti gunung" yang diminta.
 function buildPinwheel(x, z) {
   const group = new THREE.Group();
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0xfff6e9, roughness: 0.6 });
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 8), poleMat);
-  pole.position.y = 1.2;
-  group.add(pole);
+  const towerHeight = 60 + Math.random() * 30; // 60-90 unit — raksasa dibanding gedung tertinggi (~22-28.6)
 
+  // pondasi kecil di dasar tiang
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xe8d9f0, roughness: 0.8 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4, 1.6, 14), baseMat);
+  base.position.y = 0.8;
+  group.add(base);
+
+  // tiang menara meruncing ke atas, dengan 4 pita warna aksen selang-
+  // seling (bukan tiang polos) supaya tetap terasa ceria & mudah dilihat
+  // dari jauh, bukan menara industri yang kaku/monoton
+  const stripeColors = [0xfff6e9, 0xff8fb8];
+  const stripeCount = 5;
+  const stripeH = towerHeight / stripeCount;
+  for (let s = 0; s < stripeCount; s++) {
+    const rBottom = 2.2 - (s / stripeCount) * 1.3;
+    const rTop = 2.2 - ((s + 1) / stripeCount) * 1.3;
+    const stripe = new THREE.Mesh(
+      new THREE.CylinderGeometry(rTop, rBottom, stripeH, 12),
+      new THREE.MeshStandardMaterial({ color: stripeColors[s % 2], roughness: 0.55 })
+    );
+    stripe.position.y = 1.6 + stripeH * s + stripeH / 2;
+    group.add(stripe);
+  }
+
+  // hub (poros) tempat bilah menempel, di puncak tiang
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xffd166, roughness: 0.4, metalness: 0.2 });
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 14), hubMat);
+  const hubY = 1.6 + towerHeight + 1.2;
+  hub.position.y = hubY;
+  group.add(hub);
+
+  // bilah kincir — bentuk sama seperti versi kecil sebelumnya (segitiga
+  // ala kincir kertas), tapi diskalakan jauh lebih besar sebanding dgn
+  // towerHeight supaya proporsinya tetap masuk akal walau tiangnya raksasa
+  const armLen = towerHeight * 0.32; // 19-29 unit — bilah sepanjang ini
   const bladeColors = [0xff6f9f, 0xffd166, 0x8fd0f7, 0xa8e6cf];
   const bladeGroup = new THREE.Group();
   const bladeCount = 4;
@@ -2674,32 +2715,40 @@ function buildPinwheel(x, z) {
     const mat = new THREE.MeshStandardMaterial({
       color: bladeColors[i % bladeColors.length], roughness: 0.5, side: THREE.DoubleSide,
     });
-    // bentuk bilah segitiga sederhana (BufferGeometry dari 3 titik) supaya
-    // terlihat seperti kincir kertas, bukan cuma persegi kaku
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
-    shape.lineTo(0.55, 0.08);
-    shape.lineTo(0.55, 0.55);
-    shape.lineTo(0.08, 0.55);
+    shape.lineTo(armLen, armLen * 0.14);
+    shape.lineTo(armLen, armLen);
+    shape.lineTo(armLen * 0.14, armLen);
     shape.lineTo(0, 0);
     const blade = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
     blade.rotation.z = (i / bladeCount) * Math.PI * 2;
     bladeGroup.add(blade);
   }
-  bladeGroup.position.y = 2.35;
+  bladeGroup.position.y = hubY;
   group.add(bladeGroup);
 
   group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.position.set(x, 0, z);
   group.rotation.y = Math.random() * Math.PI * 2;
   scene.add(group);
-  pinwheelList.push({ blades: bladeGroup, speed: 3 + Math.random() * 3 });
+  // Collider di pondasi/tiang — struktur sebesar ini wajib menghalangi
+  // mobil (kincir kecil sebelumnya sengaja tanpa collider karena terlalu
+  // ramping untuk terasa perlu; versi raksasa ini beda cerita).
+  addRectCollider(x, z, 9, 9, group.rotation.y);
+  pinwheelList.push({ blades: bladeGroup, speed: 1.1 + Math.random() * 0.9 }); // diperlambat dari versi kecil (3-6) — bilah sebesar ini akan terlihat kacau/tidak natural kalau berputar secepat kincir kertas mini
 }
 
 function buildPinwheels() {
-  const PINWHEEL_COUNT = 24;
+  // Diturunkan dari 24 (versi kecil) jadi 10 (permintaan user), sebanding
+  // dgn ukurannya yang jauh lebih besar — 10 menara raksasa yang tersebar
+  // sudah cukup untuk terasa "ramai" tanpa saling berdempetan atau
+  // menutupi pemandangan kota.
+  const PINWHEEL_COUNT = 10;
   for (let i = 0; i < PINWHEEL_COUNT; i++) {
-    const spot = findClearRandomSpot(3);
+    // margin clear-spot dinaikkan (3 -> 16) sebanding dgn ukuran pondasi
+    // & bentang bilah yang jauh lebih besar dari versi kecil sebelumnya
+    const spot = findClearRandomSpot(16);
     if (!spot) continue;
     buildPinwheel(spot.x, spot.z);
   }

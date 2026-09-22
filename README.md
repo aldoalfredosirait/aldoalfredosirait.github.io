@@ -160,6 +160,45 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 10) — Kincir angin diganti versi RAKSASA (10 menara, sebelumnya 24 kincir kecil)
+Permintaan user: kincir angin (SECTION 8G, entri lanjutan 8) diganti jadi
+versi besar "seperti tinggi gunung", dan jumlahnya 10.
+
+**Interpretasi ukuran**: literal "setinggi gunung" tidak proporsional
+dengan skala dunia (WORLD_HALF=320), jadi diterjemahkan jadi menara
+kincir raksasa yang menjulang jauh di atas SEMUA struktur lain di kota:
+tiang 60-90 unit (dibanding gedung tertinggi ~22-28.6, dinding bebatuan
+batas dunia ~17-20, dan pesawat baliho 32-56) — dramatis, terlihat dari
+kejauhan sebagai penanda garis langit baru.
+
+**Perubahan** di `buildPinwheel()`/`buildPinwheels()` (nama fungsi &
+`pinwheelList` TIDAK diganti supaya wiring ke `init()`/`animate()` tidak
+perlu disentuh): tiang tunggal ramping (tinggi 2.4) diganti menara
+meruncing bertingkat 5 pita warna selang-seling (mirip pola lantai
+`buildBigBuilding`) + pondasi di dasar + hub bola di puncak. Bilah
+kincir tetap bentuk segitiga ala kincir kertas seperti sebelumnya, tapi
+diskalakan proporsional ke tinggi tiang (`armLen = towerHeight * 0.32`,
+jadi 19-29 unit, bukan 0.55 unit tetap). Kecepatan putar DIPERLAMBAT
+(3-6 -> 1.1-2.0 rad/s) — bilah sebesar ini akan terlihat kacau/tidak
+natural kalau berputar secepat kincir kertas mini. Jumlah diturunkan
+24 -> 10 (permintaan user, juga sebanding ukurannya yang jauh lebih
+besar — 10 menara raksasa sudah cukup ramai tanpa berdempetan). Margin
+`findClearRandomSpot` dinaikkan 3 -> 16 sebanding ukuran pondasi & bentang
+bilah. Collider BARU ditambahkan (`addRectCollider(x,z,9,9,...)`) —
+versi kecil sebelumnya sengaja tanpa collider (terlalu ramping untuk
+terasa perlu), versi raksasa ini wajib menghalangi mobil.
+
+**Catatan overlap visual**: pada towerHeight maksimum (90), ujung
+sapuan bilah bisa mencapai ±40 unit dari hub sehingga sesekali tumpang
+tindih secara visual dengan lapisan pesawat/awan di sekitarnya — ini
+disengaja sebagai efek dramatis "menjulang", bukan collision fisik
+(dekorasi langit di codebase ini murni visual, tidak saling bertabrakan).
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang geometri
+tiang & hub secara manual (tidak ada celah mengambang antara tiang dan
+hub, tumpang tindih ~0.4 unit yang disengaja) untuk memastikan tidak ada
+potongan struktur yang salah posisi.
+
 ### 2026-09-21 (lanjutan 9) — Tulisan baliho pesawat diganti 15 variasi kalimat (sebelumnya 1 kalimat tetap)
 Permintaan user: ganti tulisan di baliho pesawat — sebelumnya SATU kalimat
 tetap ("Selamat Ulang Tahun Sayang") dipakai bersama oleh ke-10 pesawat —
