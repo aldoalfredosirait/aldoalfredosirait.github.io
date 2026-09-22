@@ -1177,8 +1177,53 @@ function updateClowns(elapsed) {
 // sudah dipakai banner foto/HAPPY BIRTHDAY (lihat Log Keputusan Desain).
 const AIRPLANE_COUNT = 10;
 const AIRPLANE_SCALE = 2.4;
-let airplaneBannerTex = null;
+// Daftar kalimat baliho pesawat — permintaan user mengganti satu kalimat
+// tunggal ("Selamat Ulang Tahun Sayang") jadi variasi kalimat romantis/
+// bercanda. Karena jumlah pesawat (AIRPLANE_COUNT=10) lebih sedikit dari
+// jumlah kalimat (15), `buildAirplanes()` mengocok array ini lalu
+// mengambil 10 kalimat PERTAMA (tanpa pengulangan) supaya tiap pesawat
+// membawa kalimat berbeda dan variasinya terasa acak tiap kali halaman
+// dibuka — bukan 10 pesawat dengan kalimat yang sama seperti sebelumnya.
+const AIRPLANE_MESSAGES = [
+  "Selamat ulang tahun, pahlawan favoritku.",
+  "Met ulang tahun, partner merusuhku.",
+  "Happy birthday, alasan tersenyumku.",
+  "Selamat bertambah umur, manusia favoritku.",
+  "Panjang umur, pencuri hatiku.",
+  "Happy birthday, tokoh utamaku.",
+  "Selamat ulang tahun, takdir indahku.",
+  "Happy birthday, pengacau pikiranku.",
+  "Selamat ulang tahun, muara rinduku.",
+  "Met ultah, alasan bahagianya aku.",
+  "Happy birthday, candu terbesarku.",
+  "Selamat bertambah usia, tempat pulangku.",
+  "Panjang umur, pemeran utama hidupku.",
+  "Happy birthday, si paling bikin kangen.",
+  "Selamat ulang tahun, penenang terbaikku.",
+];
+
+// Textures di-cache per teks (bukan dibuat ulang tiap pesawat) — kalau di
+// masa depan AIRPLANE_COUNT > jumlah kalimat dan ada teks yang terpakai
+// lebih dari sekali, canvas 2048x320-nya cukup dibuat sekali lalu
+// texture-nya dipakai bersama oleh pesawat-pesawat dengan kalimat sama.
+const airplaneBannerTexCache = new Map();
 const airplaneList = []; // { group, propeller, radius, height, speed, dir, phase }
+
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getAirplaneBannerTexture(text) {
+  if (airplaneBannerTexCache.has(text)) return airplaneBannerTexCache.get(text);
+  const tex = makeAirplaneBannerTexture(text);
+  airplaneBannerTexCache.set(text, tex);
+  return tex;
+}
 
 function makeAirplaneBannerTexture(text) {
   const canvas = document.createElement("canvas");
@@ -1205,10 +1250,10 @@ function makeAirplaneBannerTexture(text) {
 }
 
 // Membangun SATU unit pesawat+baliho (dipanggil 10x oleh buildAirplanes()).
-// Tekstur baliho (`airplaneBannerTex`) dibuat sekali saja di luar fungsi
-// ini dan dipakai bersama oleh ke-10 pesawat lewat satu `bannerMat` yang
-// sama — sepuluh canvas 2048x320 terpisah tidak perlu, teksnya toh identik
-// ("Selamat Ulang Tahun Sayang"), jadi cukup satu texture di-share.
+// `bannerMat` sekarang beda-beda per pesawat (satu per kalimat unik di
+// AIRPLANE_MESSAGES, lihat buildAirplanes() & getAirplaneBannerTexture) —
+// bukan lagi satu texture yang di-share semua pesawat, supaya tiap
+// pesawat bisa membawa kalimat baliho yang berbeda.
 function buildOneAirplane(bannerMat) {
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.15, fog: false });
@@ -1272,13 +1317,17 @@ function buildOneAirplane(bannerMat) {
 }
 
 function buildAirplanes() {
-  airplaneBannerTex = makeAirplaneBannerTexture("Selamat Ulang Tahun Sayang");
-  // `side: THREE.DoubleSide` DIHAPUS — sudah tidak perlu lagi karena
-  // baliho sekarang 2 mesh terpisah (lihat buildOneAirplane) yang masing-
-  // masing menampilkan sisi depannya sendiri; DoubleSide di sini dulu
-  // justru penyebab teks terbalik dari salah satu arah.
-  const bannerMat = new THREE.MeshBasicMaterial({ map: airplaneBannerTex, toneMapped: false, fog: false });
+  // Kocok daftar kalimat lalu ambil AIRPLANE_COUNT pertama — lihat
+  // komentar AIRPLANE_MESSAGES di atas.
+  const shuffledMessages = shuffleArray(AIRPLANE_MESSAGES);
   for (let i = 0; i < AIRPLANE_COUNT; i++) {
+    const text = shuffledMessages[i % shuffledMessages.length];
+    const tex = getAirplaneBannerTexture(text);
+    // `side: THREE.DoubleSide` DIHAPUS — sudah tidak perlu lagi karena
+    // baliho sekarang 2 mesh terpisah (lihat buildOneAirplane) yang
+    // masing-masing menampilkan sisi depannya sendiri; DoubleSide di sini
+    // dulu justru penyebab teks terbalik dari salah satu arah.
+    const bannerMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false });
     const { group, propeller } = buildOneAirplane(bannerMat);
     // Radius disebar 0.55..0.885 dari WORLD_HALF — masih dekat dinding
     // bebatuan batas dunia (mengitari batas bukit bebatuan, sesuai

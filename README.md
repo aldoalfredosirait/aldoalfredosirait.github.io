@@ -160,6 +160,33 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 9) — Tulisan baliho pesawat diganti 15 variasi kalimat (sebelumnya 1 kalimat tetap)
+Permintaan user: ganti tulisan di baliho pesawat — sebelumnya SATU kalimat
+tetap ("Selamat Ulang Tahun Sayang") dipakai bersama oleh ke-10 pesawat —
+jadi 15 kalimat variasi (campuran romantis & bercanda, mis. "Panjang umur,
+pencuri hatiku.", "Happy birthday, si paling bikin kangen.").
+
+**Perubahan** (SECTION 8B2, `script.js`): array baru `AIRPLANE_MESSAGES`
+(15 kalimat) menggantikan literal string tunggal. Karena
+`AIRPLANE_COUNT` (10) < jumlah kalimat (15), `buildAirplanes()` mengocok
+array lewat `shuffleArray()` lalu mengambil 10 kalimat pertama tanpa
+pengulangan — tiap pesawat membawa kalimat berbeda, dan kombinasinya
+acak tiap kali halaman dimuat ulang (refresh) supaya tidak selalu 10
+kalimat yang sama tampil duluan. Texture kanvas 2048x320 tidak lagi
+dibuat satu kali di luar loop dan di-share semua pesawat (`airplaneBannerTex`
+lama) — sekarang dibuat per-teks lewat `getAirplaneBannerTexture()` yang
+meng-cache hasilnya di `airplaneBannerTexCache` (Map teks -> texture),
+supaya kalau suatu saat jumlah pesawat > jumlah kalimat, teks yang
+terpakai berulang tidak menggambar ulang canvas yang sama.
+
+Mekanisme `shrinkFontToFit` (dipakai `makeAirplaneBannerTexture`, tidak
+diubah) otomatis mengecilkan font per kalimat supaya tetap muat di lebar
+baliho — tidak perlu penyesuaian manual meski panjang tiap kalimat beda.
+
+**Verifikasi**: ke-15 kalimat dirender di luar browser (font fallback
+lebih lebar dari Baloo 2, jadi lebih ketat dari kondisi asli) — semuanya
+muat di lebar kanvas, font terpakai 72-108px, tidak ada yang terpotong.
+
 ### 2026-09-21 (lanjutan 8) — Kalimat "di pelosok" dihapus (terlalu personal), pesawat diturunkan & baliho tidak terbalik, +3 efek animasi baru
 Permintaan user tiga bagian:
 
