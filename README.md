@@ -160,6 +160,57 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 8) — Kalimat "di pelosok" dihapus (terlalu personal), pesawat diturunkan & baliho tidak terbalik, +3 efek animasi baru
+Permintaan user tiga bagian:
+
+**(1) Kalimat balon dialog "di pelosok" terlalu personal.** 25 kalimat di
+`GREETER_MESSAGES` (entri lanjutan 7) yang eksplisit menyebut "kerja di
+plosok/pelosok", "sinyal susah", "jauh dari hiburan", dsb. digeneralkan:
+nada penyemangat/doanya dipertahankan, tapi rujukan konkret ke kondisi
+kerja Gabriela dihapus (mis. "kerja di plosok itu tak mudah" -> "perjalananmu
+tidak selalu mudah"). Total tetap 200 kalimat unik, semua tetap memuat
+nama Gabriela/GbYoung — hanya isinya yang diperhalus.
+
+**(2) Pesawat baliho: dua masalah terpisah.**
+- *Terbang lebih rendah*: ketinggian di `buildAirplanes()` diturunkan dari
+  `46 + (i%5)*11` (46-90, rata-rata ~68) jadi `32 + (i%5)*6` (32-56,
+  rata-rata ~44) — turun ~35%. Batas bawah 32 dihitung sengaja tetap di
+  atas struktur tertinggi kota (gedung + spire puncak di
+  `buildBigBuilding()`, maksimum ~28.6) supaya pesawat tidak pernah
+  terlihat menembus atap gedung manapun.
+- *Tulisan baliho terbalik*: baliho pesawat sebelumnya SATU mesh dengan
+  `material.side = THREE.DoubleSide` menampilkan texture yang sama dari
+  kedua sisi. Karena pesawat terbang muter mengelilingi kota, sisi
+  belakang baliho (yang pasti terlihat juga dari sudut tertentu)
+  menampilkan tulisan CERMIN/terbalik. Diperbaiki dengan trik yang sama
+  yang sudah dipakai banner "HAPPY BIRTHDAY" di monumen: baliho dipecah
+  jadi DUA mesh (`bannerFront` & `bannerBack`, `FrontSide` bawaan,
+  `DoubleSide` dihapus dari materialnya), salah satunya diputar
+  `rotation.y = Math.PI`. Karena geometrinya ikut berputar sebagai satu
+  kesatuan rigid (bukan cuma tembus-pandang lewat DoubleSide), tulisan
+  terbaca benar dari kedua arah.
+
+**(3) +3 efek animasi baru (SECTION 8G) supaya kota makin ramai**, semua
+di-hook ke `init()`/`animate()`:
+- **Balon udara** (`buildHotAirBalloons`, 7 buah): melayang mengelilingi
+  kota di lapisan langit sendiri (y 60-84) — di ATAS pesawat (32-56) tapi
+  di BAWAH awan (48-92), supaya tidak numpuk dengan dekorasi langit lain.
+- **Kincir angin** (`buildPinwheels`, 24 buah): tersebar di darat lewat
+  `findClearRandomSpot()`, bilahnya berputar terus-menerus
+  (`updatePinwheels`) — gerakan cepat & jelas dari dekat, beda dari
+  dekorasi statis (tugu/patung/gedung) yang sudah ada.
+- **Hujan konfeti ambient** (`buildConfettiRain`, 90 keping): potongan
+  kertas kecil jatuh pelan + goyang menyamping, tersebar di SELURUH kota
+  sepanjang waktu (bukan cuma meledak sesaat di finish seperti SECTION
+  8C) — didaur ulang ke atas lagi saat menyentuh tanah, tanpa alokasi
+  objek baru tiap frame. Jumlahnya sengaja dijaga tipis (90, bukan
+  ratusan) supaya tidak mengganggu visibilitas saat menyetir.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang margin
+ketinggian pesawat vs struktur tertinggi kota (32 vs 28.6, aman ~3.4
+unit); disimulasikan ulang ke-200 kalimat balon dialog — 200 unik, semua
+tetap memuat nama, tidak ada lagi kata "plosok"/"pelosok".
+
 ### 2026-09-21 (lanjutan 7) — Kalimat balon dialog diganti 200 ucapan baru (dari daftar user) yang disesuaikan dengan data Gabriela
 Permintaan user: ganti kalimat-kalimat ucapan di balon dialog dengan
 daftar ucapan ulang tahun yang user berikan, tetapi disesuaikan dgn data:

@@ -1238,11 +1238,26 @@ function buildOneAirplane(bannerMat) {
   propeller.position.set(4.6, 0, 0);
   group.add(propeller);
 
-  // baliho besar di belakang, ditarik pakai "tali"
+  // Baliho besar di belakang, ditarik pakai "tali". Sebelumnya SATU mesh
+  // dengan material `side: THREE.DoubleSide` — dari sisi belakang (yang
+  // pasti kelihatan juga karena pesawat terbang muter mengelilingi kota),
+  // DoubleSide menampilkan tekstur yang sama apa adanya sehingga tulisan
+  // terbaca TERBALIK (cermin). Diperbaiki dengan trik yang sama seperti
+  // banner "HAPPY BIRTHDAY" di monumen (lihat SECTION 8, `bannerFront`/
+  // `bannerBack`): DUA mesh terpisah, masing-masing `FrontSide` (bawaan
+  // material, DoubleSide dihapus di buildAirplanes()), satunya diputar
+  // 180° (`rotation.y = Math.PI`) supaya sisi depannya menghadap ke arah
+  // berlawanan. Dengan cara ini geometrinya ikut berputar sebagai satu
+  // kesatuan, bukan cuma tembus pandang dari belakang, jadi tulisan
+  // terbaca BENAR (tidak cermin) dari kedua arah.
   const bannerW = 34, bannerH = 5.6;
-  const bannerFront = new THREE.Mesh(new THREE.PlaneGeometry(bannerW, bannerH), bannerMat);
-  bannerFront.position.set(-3.1 - bannerW / 2 - 3, -1.6, 0);
-  group.add(bannerFront);
+  const bannerGeo = new THREE.PlaneGeometry(bannerW, bannerH);
+  const bannerFront = new THREE.Mesh(bannerGeo, bannerMat);
+  bannerFront.position.set(-3.1 - bannerW / 2 - 3, -1.6, 0.05);
+  const bannerBack = new THREE.Mesh(bannerGeo, bannerMat);
+  bannerBack.position.set(-3.1 - bannerW / 2 - 3, -1.6, -0.05);
+  bannerBack.rotation.y = Math.PI;
+  group.add(bannerFront, bannerBack);
 
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 4),
     new THREE.MeshStandardMaterial({ color: 0xffffff, fog: false }));
@@ -1250,7 +1265,7 @@ function buildOneAirplane(bannerMat) {
   rope.position.set(-4.6, -0.8, 0);
   group.add(rope);
 
-  group.traverse((o) => { if (o.isMesh && o !== bannerFront) o.castShadow = true; });
+  group.traverse((o) => { if (o.isMesh && o !== bannerFront && o !== bannerBack) o.castShadow = true; });
   group.scale.set(AIRPLANE_SCALE, AIRPLANE_SCALE, AIRPLANE_SCALE);
   scene.add(group);
   return { group, propeller };
@@ -1258,7 +1273,11 @@ function buildOneAirplane(bannerMat) {
 
 function buildAirplanes() {
   airplaneBannerTex = makeAirplaneBannerTexture("Selamat Ulang Tahun Sayang");
-  const bannerMat = new THREE.MeshBasicMaterial({ map: airplaneBannerTex, side: THREE.DoubleSide, toneMapped: false, fog: false });
+  // `side: THREE.DoubleSide` DIHAPUS — sudah tidak perlu lagi karena
+  // baliho sekarang 2 mesh terpisah (lihat buildOneAirplane) yang masing-
+  // masing menampilkan sisi depannya sendiri; DoubleSide di sini dulu
+  // justru penyebab teks terbalik dari salah satu arah.
+  const bannerMat = new THREE.MeshBasicMaterial({ map: airplaneBannerTex, toneMapped: false, fog: false });
   for (let i = 0; i < AIRPLANE_COUNT; i++) {
     const { group, propeller } = buildOneAirplane(bannerMat);
     // Radius disebar 0.55..0.885 dari WORLD_HALF — masih dekat dinding
@@ -1267,10 +1286,14 @@ function buildAirplanes() {
     // dekat supaya jauh lebih mudah terlihat dari lintasan, bukan cuma
     // menumpuk persis di garis batas terjauh.
     const radius = WORLD_HALF * (0.55 + 0.035 * i);
-    // Ketinggian & kecepatan divariasikan per pesawat (bukan angka sama
-    // semua) supaya ke-10 pesawat tidak bertabrakan satu sama lain dan
-    // gerakannya terasa jelas hidup, bukan seperti satu formasi kaku.
-    const height = 46 + (i % 5) * 11;
+    // Ketinggian DITURUNKAN (permintaan user "terbang lebih rendah"):
+    // sebelumnya 46-90 (rata-rata ~68), sekarang 32-56 (rata-rata ~44) —
+    // turun ~35%. Batas bawah 32 sengaja dijaga di atas struktur
+    // tertinggi di kota (gedung + spire puncak, maksimum sekitar y=28.6
+    // di buildBigBuilding()) supaya pesawat tidak pernah kelihatan
+    // menembus atap gedung. Kecepatan tetap divariasikan per pesawat
+    // supaya ke-10 pesawat tidak bertabrakan & gerakannya jelas hidup.
+    const height = 32 + (i % 5) * 6;
     const speed = 0.05 + (i % 4) * 0.011;
     const dir = i % 2 === 0 ? 1 : -1; // separuh searah jarum jam, separuh berlawanan
     const phase = (i / AIRPLANE_COUNT) * Math.PI * 2;
@@ -1447,10 +1470,13 @@ function buildCityPeople() {
 // "Gabriela" atau "GbYoung" (permintaan user sebelumnya, tetap dipertahankan).
 // Kalimatnya diadaptasi dari daftar ucapan ulang tahun yang diberikan user
 // (kutipan bijak, sahabat, doa, lucu, penguat diri, usia, semangat), lalu
-// disesuaikan dengan data Gabriela: perempuan, Kristen, ulang tahun ke-26,
-// dan sedang berjuang bekerja di plosok dengan hiburan minim. Sengaja tidak
-// ada kalimat yang berbau agama lain / usia 17, 21, 30, 40, 50 / sapaan
-// Ayah-Ibu (tidak relevan). Diambil urut per index oleh
+// disesuaikan dengan data Gabriela: perempuan, Kristen, ulang tahun ke-26.
+// Sebelumnya sebagian kalimat menyebut "kerja di plosok/pelosok" secara
+// eksplisit — DIHAPUS (lihat Log Keputusan Desain "Kalimat 'di pelosok'
+// terlalu personal") karena dirasa terlalu personal untuk dibaca 200 orang
+// sekaligus; nada penyemangatnya dipertahankan tapi digeneralkan. Sengaja
+// tidak ada kalimat yang berbau agama lain / usia 17, 21, 30, 40, 50 /
+// sapaan Ayah-Ibu (tidak relevan). Diambil urut per index oleh
 // `getUniqueGreeterMessage(index)`, jadi tiap orang dapat kalimat berbeda.
 // Panjang tiap kalimat dijaga <= ~120 karakter supaya font balon tetap
 // besar (lihat `makeSpeechBubbleTexture`, teks di-wrap multi-baris).
@@ -1604,35 +1630,35 @@ const GREETER_MESSAGES = [
   "Harimu indah karena kamu pantas bahagia, Gabriela. Selamat ulang tahun! 🌷",
   "Semoga lilin ulang tahunmu, GbYoung, jadi tanda terang menuju tahun yang manis. 🕯️",
   "Gabriela, selamat ulang tahun! Kamu pantas dirayakan hari ini. 🎂",
-  "Selamat ulang tahun, Gabriela. Tahun ini tak mudah bekerja di plosok, tapi lihat, kamu masih kuat berdiri! 💪",
-  "Di plosok yang sepi hiburan pun kamu tidak sendirian, GbYoung. Banyak yang peduli padamu. 🤍",
-  "Semoga usia baru ini membawa penyembuhan untuk lelah yang kamu bawa dari tempat kerja jauh itu, Gabriela. 🌿",
+  "Selamat ulang tahun, Gabriela. Tahun ini tak selalu mudah, tapi lihat, kamu masih kuat berdiri! 💪",
+  "Di hari-hari yang terasa sepi sekalipun, GbYoung, kamu tidak sendirian. Banyak yang peduli padamu. 🤍",
+  "Semoga usia baru ini membawa penyembuhan untuk semua lelah yang kamu simpan, Gabriela. 🌿",
   "Happy birthday, Gabriela. Hari ini tak harus baik-baik saja; cukup ada, bernapas, dan percaya besok lebih baik. 🌤️",
-  "Selamat ulang tahun untuk jiwa yang berjuang dalam diam di pelosok, GbYoung. Tuhan memberi kekuatan tepat waktunya. 🙏",
-  "Mungkin bukan ulang tahun yang kamu bayangkan, Gabriela, jauh dari keramaian. Tapi badai pasti berlalu, pejuang! ⛅",
+  "Selamat ulang tahun untuk jiwa yang berjuang dalam diam, GbYoung. Tuhan memberi kekuatan tepat waktunya. 🙏",
+  "Mungkin bukan ulang tahun yang kamu bayangkan, Gabriela. Tapi badai pasti berlalu, pejuang! ⛅",
   "Kalau belum bisa bahagia untuk dirimu sendiri, biarlah kami yang bahagia untukmu dulu, GbYoung. 🎈",
-  "Semoga semesta memberi apa yang kamu butuhkan di plosok itu, Gabriela, yang membuatmu tumbuh. 🌱",
+  "Semoga semesta memberi apa yang benar-benar kamu butuhkan, Gabriela, yang membuatmu tumbuh. 🌱",
   "Happy birthday, GbYoung. Kamu sudah lewati hari-hari gelap dan masih bisa membaca ini. Itu keajaiban! 🌟",
   "Selamat ulang tahun untukmu yang masih percaya kebaikan meski dunia kadang tak ramah, Gabriela. Kami bangga! 🥰",
-  "Sinyal susah dan hiburan minim, tapi ucapan dari kami sampai juga, Gabriela! Selamat ulang tahun! 📡",
-  "Jauh dari kota, jauh dari hiburan, tapi dekat di hati kami, GbYoung. Selamat ulang tahun! 🏕️",
-  "Kerja di plosok itu tak mudah, Gabriela, dan kamu tetap jalan. Kami sungguh bangga padamu! 👏",
-  "Di tempat yang sepi hiburan pun, GbYoung, hari ini tetap kita rayakan sepuasnya! 🎉",
-  "Semoga Tuhan menyertai langkahmu di plosok, Gabriela, dan melimpahkan sukacita yang tak habis. 🙏",
-  "Malam di plosok mungkin sunyi, GbYoung, tapi semoga hatimu penuh bintang dan doa. 🌌",
-  "Hiburanmu boleh minim, Gabriela, tapi hari ini kami kirim hiburan sebanyak-banyaknya! 🎪",
-  "Kamu bekerja jauh dari rumah dan tetap tersenyum, GbYoung. Selamat ulang tahun, pejuang! 🌻",
-  "Semoga pekerjaanmu di plosok penuh berkat, Gabriela, dan lelahmu diganti sukacita. Amin! 🌾",
-  "Kamu berjuang demi mimpimu di tempat yang jauh, Gabriela. Tuhan melihat, dan kami juga. 👀",
+  "Sejauh apa pun jaraknya, ucapan dari kami tetap sampai juga, Gabriela! Selamat ulang tahun! 📡",
+  "Di mana pun kamu berada, GbYoung, kamu tetap dekat di hati kami. Selamat ulang tahun! 🏕️",
+  "Perjalananmu tidak selalu mudah, Gabriela, dan kamu tetap jalan. Kami sungguh bangga padamu! 👏",
+  "Sesibuk apa pun harimu biasanya, GbYoung, hari ini tetap kita rayakan sepuasnya! 🎉",
+  "Semoga Tuhan menyertai setiap langkahmu, Gabriela, dan melimpahkan sukacita yang tak habis. 🙏",
+  "Malam ini mungkin terasa sunyi, GbYoung, tapi semoga hatimu penuh bintang dan doa. 🌌",
+  "Hari-hari biasa boleh terasa datar, Gabriela, tapi hari ini kami kirim keceriaan sebanyak-banyaknya! 🎪",
+  "Kamu terus melangkah dan tetap tersenyum, GbYoung. Selamat ulang tahun, pejuang! 🌻",
+  "Semoga pekerjaan dan usahamu penuh berkat, Gabriela, dan lelahmu diganti sukacita. Amin! 🌾",
+  "Kamu berjuang demi mimpimu setiap hari, Gabriela. Tuhan melihat, dan kami juga. 👀",
   "Bertambah umur, bertambah berkat, GbYoung. Tak lebih, tak kurang! 🎁",
   "Jadilah dirimu yang terbaik, Gabriela, bukan versi yang orang lain inginkan. Selamat ulang tahun! 💫",
   "Panjang umur, banyak rezeki, banyak cinta, GbYoung. Titik! 💕",
-  "Semoga selalu ada alasan tersenyum tiap pagi, Gabriela, bahkan di plosok yang sepi. ☀️",
+  "Semoga selalu ada alasan tersenyum tiap pagi, Gabriela, apa pun yang sedang dihadapi. ☀️",
   "Kamu berharga, GbYoung. Jangan pernah lupa itu. Selamat ulang tahun ke-26! 💎",
-  "Di plosok hiburannya minim, Gabriela, jadi kamu sendiri yang jadi hiburan terbaik. Happy birthday! 🎭",
-  "Tanda usia ke-26: sudah kuat kerja di plosok tanpa mal dan bioskop, GbYoung! 🏔️",
-  "Semoga sinyal di plosokmu makin kuat, Gabriela, dan bahagiamu makin penuh! 📶",
-  "Kalau ada kurir bawa kue sampai plosok, itu dari kami, GbYoung! Selamat ulang tahun! 📦",
+  "Hiburan boleh datang dan pergi, Gabriela, tapi kamu sendiri sudah jadi hiburan terbaik. Happy birthday! 🎭",
+  "Tanda usia ke-26: makin tangguh menghadapi apa pun tantangannya, GbYoung! 🏔️",
+  "Semoga koneksi dengan orang-orang terkasih makin kuat, Gabriela, dan bahagiamu makin penuh! 📶",
+  "Kalau ada kejutan kue yang sampai ke tanganmu, itu dari kami, GbYoung! Selamat ulang tahun! 📦",
   "Seseorang di seberang jarak menitipkan salam: selamat ulang tahun, Gabriela! 💌",
   "Kamu alasan seseorang tersenyum tiap pagi, GbYoung. Happy birthday! 🌞",
   "Kamu bukti bahwa cinta sejati bukan dongeng, Gabriela. Selamat ulang tahun! 💕",
@@ -2486,6 +2512,209 @@ function buildFlowerFields() {
 }
 
 // =====================================================================
+// SECTION 8G — EFEK TAMBAHAN: BALON UDARA, KINCIR ANGIN & KONFETI AMBIENT
+// =====================================================================
+// Permintaan user: tambah efek-efek animasi lain supaya kota makin ramai.
+// Tiga lapisan baru yang saling melengkapi dekorasi lama (awan, burung,
+// pesawat baliho, balon buket statis di monumen):
+//  1) Balon udara (hot air balloon) besar melayang pelan mengelilingi
+//     kota di langit, lapisan visual antara pesawat (kini lebih rendah)
+//     dan awan.
+//  2) Kincir angin (pinwheel) berwarna-warni tersebar di darat, berputar
+//     terus-menerus — gerakan cepat & mencolok dari dekat, kontras dengan
+//     dekorasi statis (tugu, patung, gedung) yang sudah ada.
+//  3) Hujan konfeti ambient: potongan kertas kecil warna-warni jatuh
+//     pelan tersebar di seluruh kota sepanjang waktu (bukan cuma saat
+//     mobil sampai finish seperti SECTION 8C), supaya suasana pesta
+//     terasa berlangsung terus di mana pun mobil berada.
+
+const hotAirBalloonList = []; // { group, radius, height, speed, phase, dir }
+const pinwheelList = [];      // { blades, speed }
+const confettiList = [];      // { mesh, speed, spin, spinAxis }
+
+// --- Balon udara besar di langit ---
+function buildHotAirBalloon() {
+  const group = new THREE.Group();
+  const palette = [
+    [0xff6f9f, 0xfff2a8], [0x8fd0f7, 0xffffff], [0xd9c9ff, 0xff8fb8],
+    [0xffb066, 0xfff6e9], [0x5cd6a8, 0xfff2a8],
+  ];
+  const [colorA, colorB] = palette[Math.floor(Math.random() * palette.length)];
+
+  // envelope (badan balon) — dibangun dari irisan-irisan vertikal warna
+  // selang-seling supaya terlihat seperti balon udara sungguhan, bukan
+  // bola polos satu warna.
+  const segments = 10;
+  const envelopeGroup = new THREE.Group();
+  for (let i = 0; i < segments; i++) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: i % 2 === 0 ? colorA : colorB, roughness: 0.55, fog: false,
+    });
+    const gore = new THREE.Mesh(
+      new THREE.SphereGeometry(2.6, 8, 12, (i / segments) * Math.PI * 2, (Math.PI * 2) / segments, 0, Math.PI * 0.82),
+      mat
+    );
+    envelopeGroup.add(gore);
+  }
+  envelopeGroup.position.y = 3.2;
+  envelopeGroup.scale.set(1, 1.25, 1);
+  group.add(envelopeGroup);
+
+  // keranjang kecil menggantung di bawah
+  const basketMat = new THREE.MeshStandardMaterial({ color: 0x8a5a3a, roughness: 0.8, fog: false });
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.9, 8), basketMat);
+  basket.position.y = -0.9;
+  group.add(basket);
+
+  // tali penghubung
+  const ropeMat = new THREE.MeshStandardMaterial({ color: 0xfff6e9, fog: false });
+  [-1, 1].forEach((sx) => {
+    [-1, 1].forEach((sz) => {
+      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.1, 4), ropeMat);
+      rope.position.set(sx * 0.45, -0.3, sz * 0.45);
+      rope.rotation.z = sx * 0.12;
+      rope.rotation.x = sz * 0.12;
+      group.add(rope);
+    });
+  });
+
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+  scene.add(group);
+  return group;
+}
+
+function buildHotAirBalloons() {
+  const HOT_AIR_BALLOON_COUNT = 7;
+  for (let i = 0; i < HOT_AIR_BALLOON_COUNT; i++) {
+    const group = buildHotAirBalloon();
+    const radius = WORLD_HALF * (0.25 + 0.09 * i);
+    // Ketinggian dijaga DI ATAS pesawat (32-56, lihat buildAirplanes) tapi
+    // di bawah awan (48-92) — lapisan sendiri supaya tidak numpuk dengan
+    // dekorasi langit lain.
+    const height = 60 + (i % 4) * 8;
+    const speed = 0.018 + (i % 3) * 0.006;
+    const dir = i % 2 === 0 ? 1 : -1;
+    const phase = (i / HOT_AIR_BALLOON_COUNT) * Math.PI * 2;
+    hotAirBalloonList.push({ group, radius, height, speed, phase, dir });
+  }
+}
+
+function updateHotAirBalloons(elapsed) {
+  hotAirBalloonList.forEach((b) => {
+    const t = b.phase + elapsed * b.speed * b.dir;
+    const x = Math.cos(t) * b.radius;
+    const z = Math.sin(t) * b.radius;
+    const y = b.height + Math.sin(elapsed * 0.3 + b.phase) * 3;
+    b.group.position.set(x, y, z);
+    b.group.rotation.y = Math.sin(elapsed * 0.2 + b.phase) * 0.15; // goyang pelan, bukan menghadap arah gerak (balon udara tidak "diarahkan")
+  });
+}
+
+// --- Kincir angin berputar tersebar di darat ---
+function buildPinwheel(x, z) {
+  const group = new THREE.Group();
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0xfff6e9, roughness: 0.6 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 8), poleMat);
+  pole.position.y = 1.2;
+  group.add(pole);
+
+  const bladeColors = [0xff6f9f, 0xffd166, 0x8fd0f7, 0xa8e6cf];
+  const bladeGroup = new THREE.Group();
+  const bladeCount = 4;
+  for (let i = 0; i < bladeCount; i++) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: bladeColors[i % bladeColors.length], roughness: 0.5, side: THREE.DoubleSide,
+    });
+    // bentuk bilah segitiga sederhana (BufferGeometry dari 3 titik) supaya
+    // terlihat seperti kincir kertas, bukan cuma persegi kaku
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.lineTo(0.55, 0.08);
+    shape.lineTo(0.55, 0.55);
+    shape.lineTo(0.08, 0.55);
+    shape.lineTo(0, 0);
+    const blade = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+    blade.rotation.z = (i / bladeCount) * Math.PI * 2;
+    bladeGroup.add(blade);
+  }
+  bladeGroup.position.y = 2.35;
+  group.add(bladeGroup);
+
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  group.position.set(x, 0, z);
+  group.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(group);
+  pinwheelList.push({ blades: bladeGroup, speed: 3 + Math.random() * 3 });
+}
+
+function buildPinwheels() {
+  const PINWHEEL_COUNT = 24;
+  for (let i = 0; i < PINWHEEL_COUNT; i++) {
+    const spot = findClearRandomSpot(3);
+    if (!spot) continue;
+    buildPinwheel(spot.x, spot.z);
+  }
+}
+
+function updatePinwheels(dt) {
+  pinwheelList.forEach((p) => { p.blades.rotation.z += dt * p.speed; });
+}
+
+// --- Hujan konfeti ambient tersebar di seluruh kota ---
+function buildConfettiPiece() {
+  const colors = [0xff6f9f, 0xffd166, 0x8fd0f7, 0xa8e6cf, 0xd9c9ff, 0xffffff];
+  const mat = new THREE.MeshStandardMaterial({
+    color: colors[Math.floor(Math.random() * colors.length)],
+    roughness: 0.5, side: THREE.DoubleSide, fog: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.5), mat);
+  const x = (Math.random() * 2 - 1) * (WORLD_HALF - 10);
+  const z = (Math.random() * 2 - 1) * (WORLD_HALF - 10);
+  const y = 8 + Math.random() * 30;
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  scene.add(mesh);
+  return {
+    mesh, y0: y,
+    fallSpeed: 0.6 + Math.random() * 0.7,
+    swaySpeed: 0.6 + Math.random() * 1.2,
+    swayAmount: 0.8 + Math.random() * 1.4,
+    spinSpeed: (Math.random() - 0.5) * 2.2,
+    phase: Math.random() * Math.PI * 2,
+    baseX: x, baseZ: z,
+  };
+}
+
+function buildConfettiRain() {
+  // Jumlah dijaga moderat (bukan ratusan) — ini efek AMBIENT sepanjang
+  // waktu di seluruh peta, bukan ledakan sesaat seperti SECTION 8C, jadi
+  // kepadatannya sengaja tipis supaya tidak mengganggu visibilitas saat
+  // menyetir tapi tetap terasa "kota lagi berpesta" dari sudut mana pun.
+  const CONFETTI_COUNT = 90;
+  for (let i = 0; i < CONFETTI_COUNT; i++) {
+    confettiList.push(buildConfettiPiece());
+  }
+}
+
+function updateConfettiRain(elapsed, dt) {
+  const groundY = 0.3;
+  confettiList.forEach((c) => {
+    c.mesh.position.y -= c.fallSpeed * dt;
+    if (c.mesh.position.y < groundY) {
+      // reset ke atas lagi di titik acak baru — daur ulang tanpa alokasi
+      // objek baru tiap frame (hemat memori untuk animasi tak berhenti)
+      c.mesh.position.y = c.y0;
+      c.baseX = (Math.random() * 2 - 1) * (WORLD_HALF - 10);
+      c.baseZ = (Math.random() * 2 - 1) * (WORLD_HALF - 10);
+    }
+    c.mesh.position.x = c.baseX + Math.sin(elapsed * c.swaySpeed + c.phase) * c.swayAmount;
+    c.mesh.position.z = c.baseZ + Math.cos(elapsed * c.swaySpeed * 0.8 + c.phase) * c.swayAmount;
+    c.mesh.rotation.x += c.spinSpeed * dt;
+    c.mesh.rotation.y += c.spinSpeed * 0.7 * dt;
+  });
+}
+
+// =====================================================================
 // SECTION 7B — SUARA (Web Audio API, disintesis — tanpa file audio eksternal)
 // =====================================================================
 
@@ -3316,6 +3545,9 @@ function animate() {
   updateClowns(elapsed);
   updateAnimals(elapsed);
   updateAirplanes(elapsed, dt);
+  updateHotAirBalloons(elapsed);
+  updatePinwheels(dt);
+  updateConfettiRain(elapsed, dt);
   updateGreeters();
   checkCakeTrigger();
 
@@ -3366,6 +3598,9 @@ function init() {
   buildFlowerFields();
   buildClouds();
   buildBirds();
+  buildHotAirBalloons();
+  buildPinwheels();
+  buildConfettiRain();
 
   carGroup = buildCar();
   initCarState();
