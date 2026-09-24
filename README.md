@@ -160,6 +160,46 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 11) — Usia diperbaiki jadi ke-25 (bukan ke-26), "GbYoung" diseragamkan jadi "Gabriela", baliho pesawat diganti 15 kalimat baru
+Permintaan user tiga bagian sekaligus:
+
+**(1) Usia salah, seharusnya 25 bukan 26.** Semua rujukan angka usia di
+`GREETER_MESSAGES` (SECTION 8B4) diperbaiki: pola "ke-26"/"usia 26"/
+"26th"/"26 tahun"/"Twenty-six"/"resmi 26" dkk (42 kemunculan angka 26 di
+dalam array) diganti jadi versi "25" yang setara ("ke-25", "usia 25",
+"25th", dst). Komentar dokumentasi di atas array juga diperbarui
+("...ulang tahun ke-26" -> "ke-25"). Entri Log Keputusan Desain
+sebelumnya (lanjutan 7, 8) TIDAK diubah — itu catatan sejarah keputusan
+saat itu (usia 26 memang assumption awal), bukan status saat ini.
+
+**(2) "GbYoung" -> "Gabriela" di semua tempat.** Sebelumnya ~separuh dari
+200 kalimat balon dialog memakai "GbYoung" dan separuh lagi "Gabriela"
+(pola sengaja dari entri lanjutan 4, supaya variatif). User minta
+diseragamkan jadi "Gabriela" saja. Diganti di `script.js` (195 kemunculan,
+termasuk 1 baris komentar penjelas array) DAN di `index.html` (2
+kemunculan: `<title>` dan `<h1>` — "Perayaan di Dunia GbYoung" jadi
+"Perayaan di Dunia Gabriela"). Satu kalimat yang sebelumnya memakai
+kedua nama sekaligus dalam satu kalimat ("...Gabriela. Met ultah,
+Gabriela!") dirapikan jadi cuma sebut nama sekali supaya tidak janggal.
+Nama file/folder proyek (`kota-kenangan`) TIDAK diubah — itu nama
+teknis, bukan teks yang tampil ke pemain.
+
+**(3) Baliho pesawat (SECTION 8B2, `AIRPLANE_MESSAGES`) diganti 15
+kalimat baru** dari user (lebih personal/romantis dibanding revisi
+sebelumnya di lanjutan 9, mis. "Happy birthday, Baby", "Selamat ulang
+tahun, Pacarku yg cantik", "Happy birthday, maaf gak bisa rayaain
+bareng"). Ditulis APA ADANYA sesuai kalimat user (termasuk gaya santai
+"yg", "GBU", "yach", "rayaain") — kecuali 1 kalimat ("Panjang umur,
+Gbyoung") yang mengandung "Gbyoung", ikut diseragamkan jadi "Panjang
+umur, Gabriela" sesuai poin (2) di atas. Mekanisme kocok 10-dari-15
+(`shuffleArray`, dibuat di lanjutan 9) tidak berubah.
+
+**Verifikasi**: `node --check script.js` lolos; disimulasikan ulang
+ke-200 kalimat balon dialog (200 unik, semua sebut "Gabriela", tidak ada
+lagi angka 26) dan ke-15 kalimat baliho baru dirender di luar browser —
+semuanya muat di lebar baliho, font 66-150px, termasuk kalimat yang
+memuat emoji.
+
 ### 2026-09-21 (lanjutan 10) — Kincir angin diganti versi RAKSASA (10 menara, sebelumnya 24 kincir kecil)
 Permintaan user: kincir angin (SECTION 8G, entri lanjutan 8) diganti jadi
 versi besar "seperti tinggi gunung", dan jumlahnya 10.
