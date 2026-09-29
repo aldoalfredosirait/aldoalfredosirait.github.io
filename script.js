@@ -1874,6 +1874,96 @@ function updateGreeters() {
   });
 }
 
+// =====================================================================
+// SECTION 8B5 — PENYAPA KHUSUS SETELAH SURAT DITUTUP
+// =====================================================================
+// Permintaan user: setelah surat ulang tahun ditutup, seseorang
+// menghampiri mobil, mengucapkan selamat ulang tahun, dan memberi tahu
+// bahwa orang-orang lain di kota juga punya ucapan buat Gabriela — bukan
+// cuma menunggu sampai mobil kebetulan mendekati salah satu dari 200
+// penyapa biasa (SECTION 8B4), tapi ada satu momen tersambut secara
+// eksplisit sebagai "pembuka" begitu freeRoam dimulai.
+//
+// Bedanya dari 200 penyapa biasa: penyapa ini TIDAK menunggu mobil
+// mendekat (dia yang mendatangi mobil, bukan sebaliknya) dan balonnya
+// dipaksa tampil (`sprite.visible = true`) begitu dipicu, terlepas dari
+// jarak — baru SETELAH animasi jalan mendekatnya selesai, dia "diserahkan"
+// ke mekanisme `greeterList`/`updateGreeters()` yang sama seperti penyapa
+// lain (supaya balonnya tetap otomatis hilang kalau mobil pergi jauh, dan
+// muncul lagi kalau mobil kembali mendekat — konsisten, tidak perlu
+// timer/logic terpisah).
+
+let welcomeGreeter = null; // { group, sprite, startX, startZ, targetX, targetZ, walking, walkStartAt, joined }
+const WELCOME_GREETER_WALK_DURATION = 1.8; // detik — lama animasi "menghampiri"
+
+function buildWelcomeGreeter() {
+  // Posisi dihitung relatif ke titik spawn mobil (TRACK_WAYPOINTS[0]),
+  // BUKAN posisi acak (findClearRandomSpot) — supaya penyapa ini selalu
+  // muncul persis di dekat mobil begitu surat ditutup, konsisten setiap
+  // kali dimainkan, bukan entah di mana di kota.
+  const p0 = TRACK_WAYPOINTS[0], p1 = TRACK_WAYPOINTS[1];
+  const dirX = p1.x - p0.x, dirZ = p1.z - p0.z;
+  const dirLen = Math.hypot(dirX, dirZ) || 1;
+  // vektor tegak lurus arah mobil, untuk menaruh orangnya di SAMPING
+  // jalur (bukan di tengah lintasan/di depan mobil)
+  const sideX = -dirZ / dirLen, sideZ = dirX / dirLen;
+
+  // Offset SAMPING (perpendicular ke arah jalan) sengaja dibuat lebih
+  // besar dari separuh lebar jalan (TRACK_WIDTH/2 = 7) supaya orangnya
+  // berdiri di PINGGIR jalan/rumput, bukan di tengah lintasan tempat
+  // mobil lewat.
+  const startX = p0.x + sideX * 15 + (dirX / dirLen) * 3;
+  const startZ = p0.z + sideZ * 15 + (dirZ / dirLen) * 3;
+  const targetX = p0.x + sideX * 8.5 + (dirX / dirLen) * 1;
+  const targetZ = p0.z + sideZ * 8.5 + (dirZ / dirLen) * 1;
+
+  const group = buildPersonNPC(startX, startZ);
+  group.rotation.y = Math.atan2(targetX - startX, targetZ - startZ); // menghadap ke arah mobil sejak awal
+
+  const message = "Selamat ulang tahun, Gabriela! 🎉 Orang-orang di sini juga punya ucapan ulang tahun buat kamu, lho!";
+  const tex = makeSpeechBubbleTexture(message);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, fog: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(4.4, 2.48, 1);
+  sprite.position.set(0, 3.15, 0);
+  sprite.visible = false; // baru dipaksa true oleh triggerWelcomeGreeter()
+  group.add(sprite);
+
+  welcomeGreeter = {
+    group, sprite, startX, startZ, targetX, targetZ,
+    walking: false, walkStartAt: 0, joined: false,
+  };
+}
+
+// Dipanggil sekali dari handler tombol tutup surat (`birthday-close`).
+function triggerWelcomeGreeter() {
+  if (!welcomeGreeter) return;
+  welcomeGreeter.sprite.visible = true; // balonnya langsung tampil begitu dia mulai berjalan mendekat
+  welcomeGreeter.walking = true;
+  welcomeGreeter.walkStartAt = clock.getElapsedTime();
+}
+
+// Dipanggil tiap frame dari animate(). Selama `walking`, posisinya di-
+// interpolasi (easeOutCubic, biar melambat mendekati tujuan — bukan
+// jalan lalu berhenti mendadak) dari startX/Z ke targetX/Z. Begitu
+// animasi selesai, orangnya "diserahkan" ke `greeterList` supaya
+// balonnya sejak saat itu diatur oleh `updateGreeters()` seperti 200
+// penyapa lainnya (otomatis hilang/muncul berdasar jarak ke mobil).
+function updateWelcomeGreeter(elapsed) {
+  if (!welcomeGreeter || !welcomeGreeter.walking) return;
+  const t = Math.min(1, (elapsed - welcomeGreeter.walkStartAt) / WELCOME_GREETER_WALK_DURATION);
+  const eased = 1 - Math.pow(1 - t, 3);
+  welcomeGreeter.group.position.x = welcomeGreeter.startX + (welcomeGreeter.targetX - welcomeGreeter.startX) * eased;
+  welcomeGreeter.group.position.z = welcomeGreeter.startZ + (welcomeGreeter.targetZ - welcomeGreeter.startZ) * eased;
+  if (t >= 1) {
+    welcomeGreeter.walking = false;
+    if (!welcomeGreeter.joined) {
+      welcomeGreeter.joined = true;
+      greeterList.push({ group: welcomeGreeter.group, sprite: welcomeGreeter.sprite, active: true }); // active:true karena target sengaja ditaruh di dalam GREETER_TRIGGER_RADIUS dari titik spawn
+    }
+  }
+}
+
 function buildCityClowns() {
   const COUNT = 30; // dinaikkan dari 10 — permintaan user memperbanyak badut juga
   for (let i = 0; i < COUNT; i++) {
@@ -3621,6 +3711,7 @@ function unlockSuccess() {
   document.getElementById("birthday-close").addEventListener("click", () => {
     document.getElementById("birthday-screen").classList.remove("active");
     freeRoam = true; // surat sudah dibaca — mobil sekarang bebas jelajah ke mana saja
+    triggerWelcomeGreeter(); // seseorang menghampiri mobil & mengucapkan selamat ulang tahun
     updateRouteHUD();
   });
 }
@@ -3648,6 +3739,7 @@ function animate() {
   updatePinwheels(dt);
   updateConfettiRain(elapsed, dt);
   updateGreeters();
+  updateWelcomeGreeter(elapsed);
   checkCakeTrigger();
 
   renderer.render(scene, camera);
@@ -3692,6 +3784,7 @@ function init() {
   buildTugus();
   buildCuteStatues();
   buildCityPeople();
+  buildWelcomeGreeter();
   buildCityClowns();
   buildCityAnimals();
   buildFlowerFields();

@@ -160,6 +160,47 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 12) — Penyapa khusus menghampiri mobil begitu surat ditutup
+Permintaan user: setelah surat (SECTION "SURAT ULANG TAHUN") ditutup,
+seseorang menghampiri mobil, mengucapkan selamat ulang tahun, dan
+memberi tahu bahwa orang-orang lain di kota juga punya ucapan buat
+Gabriela.
+
+**Implementasi baru** — SECTION 8B5, tiga fungsi: `buildWelcomeGreeter()`
+(dipanggil dari `init()`, sekali di awal, seperti dekorasi lain),
+`triggerWelcomeGreeter()` (dipanggil dari handler tombol
+`birthday-close`, TEPAT saat `freeRoam` diset true), dan
+`updateWelcomeGreeter(elapsed)` (dipanggil tiap frame dari `animate()`).
+
+- Orangnya dibangun lewat `buildPersonNPC()` yang sama dipakai 200 warga
+  kota lain, tapi posisinya BUKAN dari `findClearRandomSpot()` (acak) —
+  dihitung relatif terhadap `TRACK_WAYPOINTS[0]` (titik spawn mobil),
+  supaya dia selalu muncul di lokasi yang sama & masuk akal (dekat mobil)
+  tiap kali dimainkan. Offset ke samping (tegak lurus arah jalan)
+  sengaja > separuh lebar jalan (`TRACK_WIDTH/2` = 7) supaya dia berdiri
+  di pinggir/rumput, tidak di tengah lintasan mobil.
+- Balonnya pakai `makeSpeechBubbleTexture()` yang sama dengan 200 penyapa
+  lain (word-wrap + auto-fit font, lihat entri lanjutan 6), isinya kalimat
+  tetap: "Selamat ulang tahun, Gabriela! 🎉 Orang-orang di sini juga punya
+  ucapan ulang tahun buat kamu, lho!"
+- BEDA dari 200 penyapa biasa: dia TIDAK menunggu mobil mendekat.
+  `triggerWelcomeGreeter()` langsung memaksa `sprite.visible = true` dan
+  memulai animasi "berjalan mendekat" (posisi di-interpolasi easeOutCubic
+  dari titik agak jauh ke titik dekat mobil selama 1.8 detik,
+  `WELCOME_GREETER_WALK_DURATION`) — dia yang mendatangi mobil, bukan
+  sebaliknya. Begitu animasi selesai, dia "diserahkan" ke `greeterList`/
+  `updateGreeters()` yang sama seperti penyapa lain, supaya sejak saat
+  itu balonnya otomatis hilang/muncul lagi berdasar jarak ke mobil —
+  tidak perlu timer terpisah.
+
+**Verifikasi**: `node --check script.js` lolos; posisi start/target
+dihitung ulang secara manual (start ~15.3 unit dari titik spawn, di luar
+radius trigger 9 — sesuai supaya animasi "mendekat" terlihat berarti;
+target ~8.56 unit, di dalam radius trigger 9, DAN offset sampingnya 8.5 >
+7/2 lebar jalan sehingga tidak berdiri di tengah jalan). Bubble teksnya
+dirender di luar browser — muat penuh dalam gelembung, 5 baris, tidak
+terpotong.
+
 ### 2026-09-21 (lanjutan 11) — Usia diperbaiki jadi ke-25 (bukan ke-26), "GbYoung" diseragamkan jadi "Gabriela", baliho pesawat diganti 15 kalimat baru
 Permintaan user tiga bagian sekaligus:
 
