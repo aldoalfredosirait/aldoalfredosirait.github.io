@@ -160,6 +160,78 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 14) — Setelah surat ditutup: mobil dipindah ke luar plaza monumen & dikunci total sampai warga sampai
+Permintaan user: setelah tombol tutup surat ditekan, posisi mobil
+dipindah ke luar monumen ulang tahun, lalu mobil tidak bisa bergerak
+sama sekali sebelum didatangi warga (penyapa khusus dari lanjutan 12/13).
+
+**(1) Reposisi ke luar monumen** — fungsi baru
+`repositionCarOutsideMonument()` (SECTION 8B5), dipanggil dari handler
+tombol `birthday-close` SEBELUM `triggerWelcomeGreeter()`. Arah dihitung
+dari `landmarkCenter` ke posisi mobil SAAT ITU (bukan arah tetap) —
+mobil didorong keluar ke arah yang sama dari mana dia datang, terasa
+natural, bukan lompat ke sisi berlawanan plaza. Jarak akhir dari pusat =
+`LANDMARK_PLAZA_R + 3` (27 unit — plaza sendiri radius 24, jadi mobil
+berhenti sedikit di luar tepinya, bukan pas di garis tepi). Mobil juga
+dihadapkan BALIK ke arah monumen supaya pemain tetap melihat plaza &
+animasi warga yang akan berjalan mendekat dari sana. `LANDMARK_PLAZA_R`
+sebelumnya konstanta LOKAL (`PLAZA_R`) di dalam `buildLandmark()` —
+dihoist jadi konstanta GLOBAL supaya bisa dipakai fungsi baru ini juga
+(satu sumber angka, tidak ada duplikasi magic number 24).
+
+**(2) Kunci gerak mobil** — variabel baru `carMovementLocked` (terpisah
+dari `freeRoam`, keduanya jadi true di momen yang hampir sama tapi
+maknanya beda: `freeRoam` = boleh keluar jalur aspal, `carMovementLocked`
+= input gas/setir benar-benar diabaikan total). Dicek di baris paling
+atas `updatePhysics()` — kalau true, fungsi return lebih awal sebelum
+throttle/steer diproses sama sekali, jadi mobil benar-benar diam persis
+di posisi hasil reposisi. Dibuka lagi (`carMovementLocked = false`) di
+`updateWelcomeGreeter()`, TEPAT saat animasi jalan warga penyapa selesai
+(t>=1) — bukan pakai timer terpisah, supaya "sebelum didatangi warga"
+benar-benar berarti sampai warganya benar-benar tiba di titik tujuan.
+Pesan HUD "🎉 FINISH! Sekarang bebas jelajah" juga dipindah ke momen
+unlock ini (sebelumnya langsung tampil begitu surat ditutup) supaya
+tidak menyesatkan pemain selagi mobil masih terkunci.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang secara
+manual posisi & heading hasil reposisi dengan data contoh — jarak akhir
+dari pusat monumen presis 27 (di luar plaza 24), dan vektor hadap mobil
+memang berlawanan arah (menghadap balik ke monumen) sesuai rumus.
+
+### 2026-09-21 (lanjutan 13) — BUG FIX: penyapa khusus (lanjutan 12) tidak terlihat karena posisi dihitung dari titik spawn, bukan posisi mobil saat itu
+User melaporkan: "pada saat finish dan tombol tutup surat ditekan seorang
+warga kota masih belum muncul dan berjalan mendekat".
+
+**Akar masalah**: asumsi di entri lanjutan 12 SALAH. Diasumsikan surat
+ulang tahun muncul di AWAL permainan (tepat setelah lock-screen), jadi
+posisi penyapa dihitung relatif ke `TRACK_WAYPOINTS[0]` (titik spawn) dan
+ditempatkan di situ sejak `init()`. Ternyata surat baru muncul saat mobil
+SAMPAI DI LANDMARK/KUE lewat `checkCakeTrigger()` -> `triggerCakeIntro()`
+— yaitu di ujung lain lintasan, jauh dari titik spawn. Begitu mobil
+sampai di sana dan surat ditutup, penyapa memang muncul & berjalan
+sesuai kode, tapi di lokasi yang sudah jauh ditinggalkan mobil (dekat
+spawn) — di luar pandangan kamera sama sekali. Makanya terlihat seperti
+"tidak muncul".
+
+**Perbaikan** (SECTION 8B5): `buildWelcomeGreeter()` sekarang HANYA
+membangun orangnya (posisi 0,0 sembarang) dengan `group.visible = false`
+— tidak lagi menghitung/menempatkan posisi sejak awal. Perhitungan
+posisi (start = titik agak jauh utk animasi jalan, target = titik dekat
+mobil) DIPINDAH ke dalam `triggerWelcomeGreeter()` sendiri, dihitung dari
+`carState.x`, `carState.z`, `carState.heading` SAAT FUNGSI ITU DIPANGGIL
+— persis saat tombol tutup surat diklik, di mana pun posisi mobil ketika
+itu (bisa di titik manapun sepanjang lintasan, tergantung kapan surat
+trigger). `group.visible` baru diset true di titik ini juga. Rumus
+offset samping (>7 supaya di luar lebar jalan) & rumus easing jalannya
+tidak berubah, cuma sumber posisi dasarnya yang diganti dari titik spawn
+tetap jadi posisi mobil real-time.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang secara
+manual dengan posisi & heading mobil contoh (bukan titik spawn) — hasil
+jarak start (~15.3, di luar radius trigger) dan target (~8.56, di dalam
+radius trigger 9) konsisten dengan yang diharapkan, membuktikan
+rumusnya independen dari titik manapun mobil berada saat dipanggil.
+
 ### 2026-09-21 (lanjutan 12) — Penyapa khusus menghampiri mobil begitu surat ditutup
 Permintaan user: setelah surat (SECTION "SURAT ULANG TAHUN") ditutup,
 seseorang menghampiri mobil, mengucapkan selamat ulang tahun, dan

@@ -596,6 +596,7 @@ function buildBoundaryWalls() {
 
 let landmarkCenter;
 const CAKE_TRIGGER_RADIUS = 16;
+const LANDMARK_PLAZA_R = 24; // radius plaza monumen (lihat buildLandmark()) — dihoist jadi global supaya bisa dipakai juga oleh repositionCarOutsideMonument() di SECTION 8B5
 const landmarkBalloons = []; // { mesh, baseY, phase }
 const landmarkFlags = [];    // { mesh, phase }
 const candleFlames = [];     // { mesh, phase }
@@ -719,9 +720,8 @@ function makeColorfulTextTexture(text) {
 function buildLandmark() {
   const a = FINISH_POINT;
   landmarkCenter = new THREE.Vector3(a.x, 0, a.z);
-  const PLAZA_R = 24; // "megah" — plaza sedikit diperlebar lagi mengikuti istana baru
 
-  const plazaFloor = new THREE.Mesh(new THREE.CylinderGeometry(PLAZA_R, PLAZA_R, 0.15, 36),
+  const plazaFloor = new THREE.Mesh(new THREE.CylinderGeometry(LANDMARK_PLAZA_R, LANDMARK_PLAZA_R, 0.15, 36),
     new THREE.MeshStandardMaterial({ color: 0xffc2dc, roughness: 0.9 }));
   plazaFloor.position.set(a.x, 0.05, a.z);
   plazaFloor.receiveShadow = true;
@@ -734,7 +734,7 @@ function buildLandmark() {
   // DIHAPUS di sini — digantikan total oleh istana lebar di bawah, supaya
   // tidak ada dua struktur bertumpuk/berbenturan di titik yang sama. ---
   const pillarMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.1 });
-  const pillarR = PLAZA_R * 0.6;
+  const pillarR = LANDMARK_PLAZA_R * 0.6;
 
   // --- Pelangi besar di belakang gapura, ala referensi ---
   const rainbowColors = [0xff8fb8, 0xffffff, 0xffd166, 0xb6e3f2];
@@ -756,7 +756,7 @@ function buildLandmark() {
   const pineColors = [0xff8fb8, 0xffb3cf];
   for (let i = 0; i < 8; i++) {
     const ang = (i / 8) * Math.PI * 2 + 0.3;
-    const r = PLAZA_R + 4 + Math.random() * 4;
+    const r = LANDMARK_PLAZA_R + 4 + Math.random() * 4;
     const px = a.x + Math.cos(ang) * r, pz = a.z + Math.sin(ang) * r;
     const pine = new THREE.Group();
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.8, 8),
@@ -829,7 +829,7 @@ function buildLandmark() {
   const pPrev = TRACK_WAYPOINTS[TRACK_WAYPOINTS.length - 2];
   const approachAngle = Math.atan2(a.x - pPrev.x, a.z - pPrev.z);
   const approachDirX = Math.sin(approachAngle), approachDirZ = Math.cos(approachAngle);
-  bannerGroup.position.set(a.x - approachDirX * (PLAZA_R + 6), 0, a.z - approachDirZ * (PLAZA_R + 6));
+  bannerGroup.position.set(a.x - approachDirX * (LANDMARK_PLAZA_R + 6), 0, a.z - approachDirZ * (LANDMARK_PLAZA_R + 6));
   bannerGroup.rotation.y = approachAngle + Math.PI; // sisi depan menghadap balik ke arah mobil datang
   scene.add(bannerGroup);
 
@@ -1003,7 +1003,7 @@ function buildLandmark() {
   const sparkleColors = [0xfff2a8, 0xffffff, 0xff8fb8, 0xb6e3f2];
   for (let i = 0; i < 40; i++) {
     const ang = Math.random() * Math.PI * 2;
-    const r = PLAZA_R * (0.3 + Math.random() * 0.9);
+    const r = LANDMARK_PLAZA_R * (0.3 + Math.random() * 0.9);
     const color = sparkleColors[i % sparkleColors.length];
     const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6),
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1 }));
@@ -1882,7 +1882,18 @@ function updateGreeters() {
 // bahwa orang-orang lain di kota juga punya ucapan buat Gabriela — bukan
 // cuma menunggu sampai mobil kebetulan mendekati salah satu dari 200
 // penyapa biasa (SECTION 8B4), tapi ada satu momen tersambut secara
-// eksplisit sebagai "pembuka" begitu freeRoam dimulai.
+// eksplisit sebagai "pembuka" begitu surat ditutup.
+//
+// CATATAN PENTING soal KAPAN surat muncul: surat ulang tahun ini BUKAN
+// muncul di awal permainan, melainkan saat mobil sampai di landmark/kue
+// (lihat `checkCakeTrigger()` -> `triggerCakeIntro()`) — jadi posisi
+// mobil saat surat ditutup BISA di mana saja di sepanjang lintasan,
+// bukan selalu di titik spawn. Karena itu posisi penyapa ini WAJIB
+// dihitung dari `carState.x/z/heading` SAAT `triggerWelcomeGreeter()`
+// dipanggil (lihat komentarnya di bawah), bukan dari titik tetap —
+// versi awal implementasi ini pernah salah memakai titik spawn tetap
+// (`TRACK_WAYPOINTS[0]`) sehingga penyapanya muncul jauh di luar layar,
+// tidak terlihat pemain sama sekali (lihat Log Keputusan Desain).
 //
 // Bedanya dari 200 penyapa biasa: penyapa ini TIDAK menunggu mobil
 // mendekat (dia yang mendatangi mobil, bukan sebaliknya) dan balonnya
@@ -1897,28 +1908,24 @@ let welcomeGreeter = null; // { group, sprite, startX, startZ, targetX, targetZ,
 const WELCOME_GREETER_WALK_DURATION = 1.8; // detik — lama animasi "menghampiri"
 
 function buildWelcomeGreeter() {
-  // Posisi dihitung relatif ke titik spawn mobil (TRACK_WAYPOINTS[0]),
-  // BUKAN posisi acak (findClearRandomSpot) — supaya penyapa ini selalu
-  // muncul persis di dekat mobil begitu surat ditutup, konsisten setiap
-  // kali dimainkan, bukan entah di mana di kota.
-  const p0 = TRACK_WAYPOINTS[0], p1 = TRACK_WAYPOINTS[1];
-  const dirX = p1.x - p0.x, dirZ = p1.z - p0.z;
-  const dirLen = Math.hypot(dirX, dirZ) || 1;
-  // vektor tegak lurus arah mobil, untuk menaruh orangnya di SAMPING
-  // jalur (bukan di tengah lintasan/di depan mobil)
-  const sideX = -dirZ / dirLen, sideZ = dirX / dirLen;
-
-  // Offset SAMPING (perpendicular ke arah jalan) sengaja dibuat lebih
-  // besar dari separuh lebar jalan (TRACK_WIDTH/2 = 7) supaya orangnya
-  // berdiri di PINGGIR jalan/rumput, bukan di tengah lintasan tempat
-  // mobil lewat.
-  const startX = p0.x + sideX * 15 + (dirX / dirLen) * 3;
-  const startZ = p0.z + sideZ * 15 + (dirZ / dirLen) * 3;
-  const targetX = p0.x + sideX * 8.5 + (dirX / dirLen) * 1;
-  const targetZ = p0.z + sideZ * 8.5 + (dirZ / dirLen) * 1;
-
-  const group = buildPersonNPC(startX, startZ);
-  group.rotation.y = Math.atan2(targetX - startX, targetZ - startZ); // menghadap ke arah mobil sejak awal
+  // PENTING: posisi TIDAK dihitung di sini lagi (lihat bug di bawah) —
+  // orangnya dibangun dulu dengan posisi & visibilitas sembarang
+  // (disembunyikan lewat `group.visible = false`), lalu baru ditempatkan
+  // yang sebenarnya oleh `triggerWelcomeGreeter()` persis saat surat
+  // ditutup.
+  //
+  // BUG YANG DIPERBAIKI: versi awal menghitung posisi relatif ke
+  // TRACK_WAYPOINTS[0] (titik SPAWN mobil di awal permainan) dan
+  // menempatkan orangnya di situ sejak `init()`. Ternyata surat ulang
+  // tahun baru muncul saat mobil sampai di landmark/kue lewat
+  // `checkCakeTrigger()`/`triggerCakeIntro()` (SECTION 8C-ish) — bukan
+  // di awal permainan — jadi begitu mobil sampai sana (jauh dari titik
+  // spawn) dan surat ditutup, orangnya memang "muncul & berjalan", tapi
+  // di lokasi yang sudah jauh di luar pandangan pemain (dekat titik
+  // spawn yang sudah lama ditinggalkan). Makanya user melaporkan "warga
+  // kota belum muncul" — sebenarnya muncul, cuma tidak di layar.
+  const group = buildPersonNPC(0, 0);
+  group.visible = false; // sembunyikan total sampai triggerWelcomeGreeter() menempatkannya di lokasi yang benar
 
   const message = "Selamat ulang tahun, Gabriela! 🎉 Orang-orang di sini juga punya ucapan ulang tahun buat kamu, lho!";
   const tex = makeSpeechBubbleTexture(message);
@@ -1930,14 +1937,72 @@ function buildWelcomeGreeter() {
   group.add(sprite);
 
   welcomeGreeter = {
-    group, sprite, startX, startZ, targetX, targetZ,
+    group, sprite, startX: 0, startZ: 0, targetX: 0, targetZ: 0,
     walking: false, walkStartAt: 0, joined: false,
   };
 }
 
-// Dipanggil sekali dari handler tombol tutup surat (`birthday-close`).
+// Dipanggil sekali dari handler tombol tutup surat, SEBELUM
+// `triggerWelcomeGreeter()`. Memindah mobil ke luar plaza monumen
+// (radius `LANDMARK_PLAZA_R`, lihat buildLandmark()) — permintaan user,
+// supaya mobil tidak nongkrong tepat di tengah plaza saat momen penyapa
+// datang. Arah pemindahan dihitung dari LANDMARK_CENTER ke posisi mobil
+// SAAT ITU (bukan arah tetap) — jadi mobil didorong keluar ke arah yang
+// sama dari mana dia datang, terasa natural, bukan lompat ke sisi
+// berlawanan. Mobil juga langsung dihadapkan BALIK ke arah monumen
+// supaya pemain masih melihat plaza & animasi penyapa yang akan berjalan
+// mendekat dari sana.
+function repositionCarOutsideMonument() {
+  if (!landmarkCenter || !carGroup) return;
+  const dx = carState.x - landmarkCenter.x;
+  const dz = carState.z - landmarkCenter.z;
+  const dist = Math.hypot(dx, dz);
+  let dirX, dirZ;
+  if (dist < 0.5) {
+    // fallback kalau posisi mobil kebetulan nyaris tepat di pusat plaza:
+    // pakai arah hadap mobil saat ini supaya tetap ada arah yang masuk akal
+    dirX = Math.sin(carState.heading);
+    dirZ = Math.cos(carState.heading);
+  } else {
+    dirX = dx / dist;
+    dirZ = dz / dist;
+  }
+  const OUTSIDE_R = LANDMARK_PLAZA_R + 3; // sedikit di luar tepi plaza (bukan pas di garis tepi)
+  carState.x = landmarkCenter.x + dirX * OUTSIDE_R;
+  carState.z = landmarkCenter.z + dirZ * OUTSIDE_R;
+  carState.heading = Math.atan2(-dirX, -dirZ); // menghadap balik ke arah monumen
+  carState.speed = 0;
+  carGroup.position.set(carState.x, 0, carState.z);
+  carGroup.rotation.y = carState.heading;
+}
+
+// Dipanggil sekali dari handler tombol tutup surat (`birthday-close`),
+// PERSIS pada saat itu (bisa di awal permainan atau — sesuai alur
+// sebenarnya — saat mobil sudah sampai landmark/kue). Posisi dihitung
+// dari `carState.x/z/heading` SAAT ITU JUGA (bukan titik spawn tetap),
+// supaya orangnya selalu muncul & berjalan mendekat persis di tempat
+// mobil sedang berada, di mana pun itu.
 function triggerWelcomeGreeter() {
   if (!welcomeGreeter) return;
+  // arah hadap mobil saat ini, konversi jadi vektor (lihat baris
+  // `Math.sin(carState.heading)`/`Math.cos(carState.heading)` yang sama
+  // dipakai untuk menggerakkan mobil di SECTION 10)
+  const dirX = Math.sin(carState.heading), dirZ = Math.cos(carState.heading);
+  const sideX = -dirZ, sideZ = dirX; // tegak lurus arah mobil
+
+  // Offset SAMPING sengaja > separuh lebar jalan (TRACK_WIDTH/2 = 7)
+  // supaya orangnya berdiri di pinggir jalan/rumput, bukan di tengah
+  // jalur tempat mobil berada.
+  const startX = carState.x + sideX * 15 + dirX * 3;
+  const startZ = carState.z + sideZ * 15 + dirZ * 3;
+  const targetX = carState.x + sideX * 8.5 + dirX * 1;
+  const targetZ = carState.z + sideZ * 8.5 + dirZ * 1;
+
+  welcomeGreeter.startX = startX; welcomeGreeter.startZ = startZ;
+  welcomeGreeter.targetX = targetX; welcomeGreeter.targetZ = targetZ;
+  welcomeGreeter.group.position.set(startX, 0, startZ);
+  welcomeGreeter.group.rotation.y = Math.atan2(targetX - startX, targetZ - startZ); // menghadap ke arah mobil
+  welcomeGreeter.group.visible = true;
   welcomeGreeter.sprite.visible = true; // balonnya langsung tampil begitu dia mulai berjalan mendekat
   welcomeGreeter.walking = true;
   welcomeGreeter.walkStartAt = clock.getElapsedTime();
@@ -1959,8 +2024,12 @@ function updateWelcomeGreeter(elapsed) {
     welcomeGreeter.walking = false;
     if (!welcomeGreeter.joined) {
       welcomeGreeter.joined = true;
-      greeterList.push({ group: welcomeGreeter.group, sprite: welcomeGreeter.sprite, active: true }); // active:true karena target sengaja ditaruh di dalam GREETER_TRIGGER_RADIUS dari titik spawn
+      greeterList.push({ group: welcomeGreeter.group, sprite: welcomeGreeter.sprite, active: true }); // active:true karena target sengaja ditaruh di dalam GREETER_TRIGGER_RADIUS dari posisi mobil saat trigger
     }
+    // Warga sudah sampai ("didatangi warga") — buka kunci mobil, permintaan
+    // user supaya mobil tidak bisa bergerak SEBELUM ini terjadi.
+    carMovementLocked = false;
+    updateRouteHUD();
   }
 }
 
@@ -3259,6 +3328,7 @@ function resolveCollisions(nx, nz) {
 
 function updatePhysics(dt) {
   if (!unlocked) return;
+  if (carMovementLocked) return; // mobil dikunci total (permintaan user) sampai warga penyapa selesai menghampiri, lihat triggerWelcomeGreeter() & updateWelcomeGreeter()
 
   // throttleAxis/turnDir: -1..1. Dari keyboard nilainya selalu -1/0/1
   // (persis perilaku lama, tidak berubah). Dari joystick analog mobile
@@ -3298,6 +3368,13 @@ function updatePhysics(dt) {
 // data), supaya koridor collision selalu presis mengikuti jalan yang
 // terlihat. `freeRoam` baru diset true saat surat ulang tahun ditutup. ---
 let freeRoam = false;
+// Permintaan user: setelah surat ditutup, mobil dipindah ke luar plaza
+// monumen dan TIDAK BISA digerakkan sama sekali sampai warga penyapa
+// (SECTION 8B5) selesai menghampiri. Terpisah dari `freeRoam` (yang
+// mengatur boleh/tidaknya keluar jalur) karena keduanya jadi true di
+// momen yang hampir sama tapi maknanya beda: `freeRoam` = "boleh keluar
+// jalur", `carMovementLocked` = "input gas/setir benar-benar diabaikan".
+let carMovementLocked = false;
 const TRACK_HALF_WIDTH = 7; // dijaga dekat lebar aspal (jalan lebar 14 unit) supaya mobil terasa benar-benar "di jalur"
 
 function applyRouteLock(x, z) {
@@ -3710,9 +3787,14 @@ function unlockSuccess() {
 
   document.getElementById("birthday-close").addEventListener("click", () => {
     document.getElementById("birthday-screen").classList.remove("active");
-    freeRoam = true; // surat sudah dibaca — mobil sekarang bebas jelajah ke mana saja
+    freeRoam = true; // surat sudah dibaca — mobil boleh keluar jalur
+    repositionCarOutsideMonument(); // permintaan user: mobil dipindah ke luar plaza monumen
+    carMovementLocked = true; // permintaan user: mobil tidak bisa bergerak sampai warga penyapa selesai menghampiri (lihat updateWelcomeGreeter)
     triggerWelcomeGreeter(); // seseorang menghampiri mobil & mengucapkan selamat ulang tahun
-    updateRouteHUD();
+    // updateRouteHUD() SENGAJA tidak dipanggil di sini lagi — pesan
+    // "sekarang bebas jelajah" dipindah ke saat carMovementLocked benar-
+    // benar dibuka (updateWelcomeGreeter), supaya tidak menyesatkan
+    // pemain selagi mobil masih terkunci menunggu warga sampai.
   });
 }
 
