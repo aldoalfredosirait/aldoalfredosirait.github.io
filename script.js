@@ -1877,8 +1877,8 @@ function updateGreeters() {
 // =====================================================================
 // SECTION 8B5 — PENYAPA KHUSUS SETELAH SURAT DITUTUP
 // =====================================================================
-// Permintaan user: setelah surat ulang tahun ditutup, seseorang
-// menghampiri mobil, mengucapkan selamat ulang tahun, dan memberi tahu
+// Permintaan user: setelah surat ulang tahun ditutup, seseorang berada
+// di dekat mobil dengan ucapan selamat ulang tahun, dan memberi tahu
 // bahwa orang-orang lain di kota juga punya ucapan buat Gabriela — bukan
 // cuma menunggu sampai mobil kebetulan mendekati salah satu dari 200
 // penyapa biasa (SECTION 8B4), tapi ada satu momen tersambut secara
@@ -1895,35 +1895,22 @@ function updateGreeters() {
 // (`TRACK_WAYPOINTS[0]`) sehingga penyapanya muncul jauh di luar layar,
 // tidak terlihat pemain sama sekali (lihat Log Keputusan Desain).
 //
-// Bedanya dari 200 penyapa biasa: penyapa ini TIDAK menunggu mobil
-// mendekat (dia yang mendatangi mobil, bukan sebaliknya) dan balonnya
-// dipaksa tampil (`sprite.visible = true`) begitu dipicu, terlepas dari
-// jarak — baru SETELAH animasi jalan mendekatnya selesai, dia "diserahkan"
-// ke mekanisme `greeterList`/`updateGreeters()` yang sama seperti penyapa
-// lain (supaya balonnya tetap otomatis hilang kalau mobil pergi jauh, dan
-// muncul lagi kalau mobil kembali mendekat — konsisten, tidak perlu
-// timer/logic terpisah).
+// Versi SEBELUMNYA (lanjutan 12-14) membuat penyapa ini muncul agak
+// jauh lalu ANIMASI BERJALAN mendekati mobil selama 1.8 detik, dan mobil
+// dikunci (`carMovementLocked`) sampai animasi itu selesai. User minta
+// disederhanakan: TIDAK PERLU animasi jalan lagi — warga langsung ada
+// di posisi tujuan begitu surat ditutup, balon ucapannya langsung
+// tampil di saat itu juga. Karena kedatangannya sekarang instan, kunci
+// mobil pun otomatis tidak relevan lagi & DIHAPUS (lihat SECTION 10,
+// `updatePhysics()` — sudah kembali ke `if (!unlocked) return;` saja).
 
-let welcomeGreeter = null; // { group, sprite, startX, startZ, targetX, targetZ, walking, walkStartAt, joined }
-const WELCOME_GREETER_WALK_DURATION = 1.8; // detik — lama animasi "menghampiri"
+let welcomeGreeter = null; // { group, sprite }
 
 function buildWelcomeGreeter() {
-  // PENTING: posisi TIDAK dihitung di sini lagi (lihat bug di bawah) —
-  // orangnya dibangun dulu dengan posisi & visibilitas sembarang
-  // (disembunyikan lewat `group.visible = false`), lalu baru ditempatkan
-  // yang sebenarnya oleh `triggerWelcomeGreeter()` persis saat surat
-  // ditutup.
-  //
-  // BUG YANG DIPERBAIKI: versi awal menghitung posisi relatif ke
-  // TRACK_WAYPOINTS[0] (titik SPAWN mobil di awal permainan) dan
-  // menempatkan orangnya di situ sejak `init()`. Ternyata surat ulang
-  // tahun baru muncul saat mobil sampai di landmark/kue lewat
-  // `checkCakeTrigger()`/`triggerCakeIntro()` (SECTION 8C-ish) — bukan
-  // di awal permainan — jadi begitu mobil sampai sana (jauh dari titik
-  // spawn) dan surat ditutup, orangnya memang "muncul & berjalan", tapi
-  // di lokasi yang sudah jauh di luar pandangan pemain (dekat titik
-  // spawn yang sudah lama ditinggalkan). Makanya user melaporkan "warga
-  // kota belum muncul" — sebenarnya muncul, cuma tidak di layar.
+  // Posisi TIDAK dihitung di sini — orangnya dibangun dulu dengan posisi
+  // sembarang (disembunyikan lewat `group.visible = false`), lalu baru
+  // ditempatkan yang sebenarnya oleh `triggerWelcomeGreeter()` persis
+  // saat surat ditutup (lihat catatan "KAPAN surat muncul" di atas).
   const group = buildPersonNPC(0, 0);
   group.visible = false; // sembunyikan total sampai triggerWelcomeGreeter() menempatkannya di lokasi yang benar
 
@@ -1936,10 +1923,7 @@ function buildWelcomeGreeter() {
   sprite.visible = false; // baru dipaksa true oleh triggerWelcomeGreeter()
   group.add(sprite);
 
-  welcomeGreeter = {
-    group, sprite, startX: 0, startZ: 0, targetX: 0, targetZ: 0,
-    walking: false, walkStartAt: 0, joined: false,
-  };
+  welcomeGreeter = { group, sprite };
 }
 
 // Dipanggil sekali dari handler tombol tutup surat, SEBELUM
@@ -1950,8 +1934,8 @@ function buildWelcomeGreeter() {
 // SAAT ITU (bukan arah tetap) — jadi mobil didorong keluar ke arah yang
 // sama dari mana dia datang, terasa natural, bukan lompat ke sisi
 // berlawanan. Mobil juga langsung dihadapkan BALIK ke arah monumen
-// supaya pemain masih melihat plaza & animasi penyapa yang akan berjalan
-// mendekat dari sana.
+// supaya pemain masih melihat plaza & warga penyapa yang muncul di
+// sana.
 function repositionCarOutsideMonument() {
   if (!landmarkCenter || !carGroup) return;
   const dx = carState.x - landmarkCenter.x;
@@ -1977,11 +1961,10 @@ function repositionCarOutsideMonument() {
 }
 
 // Dipanggil sekali dari handler tombol tutup surat (`birthday-close`),
-// PERSIS pada saat itu (bisa di awal permainan atau — sesuai alur
-// sebenarnya — saat mobil sudah sampai landmark/kue). Posisi dihitung
-// dari `carState.x/z/heading` SAAT ITU JUGA (bukan titik spawn tetap),
-// supaya orangnya selalu muncul & berjalan mendekat persis di tempat
-// mobil sedang berada, di mana pun itu.
+// PERSIS pada saat itu, SETELAH `repositionCarOutsideMonument()` (jadi
+// posisi acuan yang dipakai di sini sudah posisi mobil yang BARU, di
+// luar monumen). Orangnya langsung ditaruh & ditampilkan di posisi
+// tujuan — TIDAK ADA animasi berjalan lagi (permintaan user).
 function triggerWelcomeGreeter() {
   if (!welcomeGreeter) return;
   // arah hadap mobil saat ini, konversi jadi vektor (lihat baris
@@ -1993,44 +1976,20 @@ function triggerWelcomeGreeter() {
   // Offset SAMPING sengaja > separuh lebar jalan (TRACK_WIDTH/2 = 7)
   // supaya orangnya berdiri di pinggir jalan/rumput, bukan di tengah
   // jalur tempat mobil berada.
-  const startX = carState.x + sideX * 15 + dirX * 3;
-  const startZ = carState.z + sideZ * 15 + dirZ * 3;
   const targetX = carState.x + sideX * 8.5 + dirX * 1;
   const targetZ = carState.z + sideZ * 8.5 + dirZ * 1;
 
-  welcomeGreeter.startX = startX; welcomeGreeter.startZ = startZ;
-  welcomeGreeter.targetX = targetX; welcomeGreeter.targetZ = targetZ;
-  welcomeGreeter.group.position.set(startX, 0, startZ);
-  welcomeGreeter.group.rotation.y = Math.atan2(targetX - startX, targetZ - startZ); // menghadap ke arah mobil
+  welcomeGreeter.group.position.set(targetX, 0, targetZ);
+  welcomeGreeter.group.rotation.y = Math.atan2(carState.x - targetX, carState.z - targetZ); // menghadap ke arah mobil
   welcomeGreeter.group.visible = true;
-  welcomeGreeter.sprite.visible = true; // balonnya langsung tampil begitu dia mulai berjalan mendekat
-  welcomeGreeter.walking = true;
-  welcomeGreeter.walkStartAt = clock.getElapsedTime();
-}
+  welcomeGreeter.sprite.visible = true;
 
-// Dipanggil tiap frame dari animate(). Selama `walking`, posisinya di-
-// interpolasi (easeOutCubic, biar melambat mendekati tujuan — bukan
-// jalan lalu berhenti mendadak) dari startX/Z ke targetX/Z. Begitu
-// animasi selesai, orangnya "diserahkan" ke `greeterList` supaya
-// balonnya sejak saat itu diatur oleh `updateGreeters()` seperti 200
-// penyapa lainnya (otomatis hilang/muncul berdasar jarak ke mobil).
-function updateWelcomeGreeter(elapsed) {
-  if (!welcomeGreeter || !welcomeGreeter.walking) return;
-  const t = Math.min(1, (elapsed - welcomeGreeter.walkStartAt) / WELCOME_GREETER_WALK_DURATION);
-  const eased = 1 - Math.pow(1 - t, 3);
-  welcomeGreeter.group.position.x = welcomeGreeter.startX + (welcomeGreeter.targetX - welcomeGreeter.startX) * eased;
-  welcomeGreeter.group.position.z = welcomeGreeter.startZ + (welcomeGreeter.targetZ - welcomeGreeter.startZ) * eased;
-  if (t >= 1) {
-    welcomeGreeter.walking = false;
-    if (!welcomeGreeter.joined) {
-      welcomeGreeter.joined = true;
-      greeterList.push({ group: welcomeGreeter.group, sprite: welcomeGreeter.sprite, active: true }); // active:true karena target sengaja ditaruh di dalam GREETER_TRIGGER_RADIUS dari posisi mobil saat trigger
-    }
-    // Warga sudah sampai ("didatangi warga") — buka kunci mobil, permintaan
-    // user supaya mobil tidak bisa bergerak SEBELUM ini terjadi.
-    carMovementLocked = false;
-    updateRouteHUD();
-  }
+  // Langsung diserahkan ke `greeterList`/`updateGreeters()` yang sama
+  // seperti 200 penyapa lain — sejak saat ini balonnya otomatis
+  // hilang/muncul berdasar jarak ke mobil, sama seperti mereka.
+  // `active:true` karena target sengaja ditaruh di dalam
+  // GREETER_TRIGGER_RADIUS (9) dari posisi mobil saat trigger.
+  greeterList.push({ group: welcomeGreeter.group, sprite: welcomeGreeter.sprite, active: true });
 }
 
 function buildCityClowns() {
@@ -3328,7 +3287,6 @@ function resolveCollisions(nx, nz) {
 
 function updatePhysics(dt) {
   if (!unlocked) return;
-  if (carMovementLocked) return; // mobil dikunci total (permintaan user) sampai warga penyapa selesai menghampiri, lihat triggerWelcomeGreeter() & updateWelcomeGreeter()
 
   // throttleAxis/turnDir: -1..1. Dari keyboard nilainya selalu -1/0/1
   // (persis perilaku lama, tidak berubah). Dari joystick analog mobile
@@ -3368,13 +3326,6 @@ function updatePhysics(dt) {
 // data), supaya koridor collision selalu presis mengikuti jalan yang
 // terlihat. `freeRoam` baru diset true saat surat ulang tahun ditutup. ---
 let freeRoam = false;
-// Permintaan user: setelah surat ditutup, mobil dipindah ke luar plaza
-// monumen dan TIDAK BISA digerakkan sama sekali sampai warga penyapa
-// (SECTION 8B5) selesai menghampiri. Terpisah dari `freeRoam` (yang
-// mengatur boleh/tidaknya keluar jalur) karena keduanya jadi true di
-// momen yang hampir sama tapi maknanya beda: `freeRoam` = "boleh keluar
-// jalur", `carMovementLocked` = "input gas/setir benar-benar diabaikan".
-let carMovementLocked = false;
 const TRACK_HALF_WIDTH = 7; // dijaga dekat lebar aspal (jalan lebar 14 unit) supaya mobil terasa benar-benar "di jalur"
 
 function applyRouteLock(x, z) {
@@ -3787,14 +3738,10 @@ function unlockSuccess() {
 
   document.getElementById("birthday-close").addEventListener("click", () => {
     document.getElementById("birthday-screen").classList.remove("active");
-    freeRoam = true; // surat sudah dibaca — mobil boleh keluar jalur
+    freeRoam = true; // surat sudah dibaca — mobil boleh keluar jalur & bebas jelajah
     repositionCarOutsideMonument(); // permintaan user: mobil dipindah ke luar plaza monumen
-    carMovementLocked = true; // permintaan user: mobil tidak bisa bergerak sampai warga penyapa selesai menghampiri (lihat updateWelcomeGreeter)
-    triggerWelcomeGreeter(); // seseorang menghampiri mobil & mengucapkan selamat ulang tahun
-    // updateRouteHUD() SENGAJA tidak dipanggil di sini lagi — pesan
-    // "sekarang bebas jelajah" dipindah ke saat carMovementLocked benar-
-    // benar dibuka (updateWelcomeGreeter), supaya tidak menyesatkan
-    // pemain selagi mobil masih terkunci menunggu warga sampai.
+    triggerWelcomeGreeter(); // permintaan user: warga langsung ada di dekat mobil dengan ucapan (tanpa animasi berjalan)
+    updateRouteHUD();
   });
 }
 
@@ -3821,7 +3768,6 @@ function animate() {
   updatePinwheels(dt);
   updateConfettiRain(elapsed, dt);
   updateGreeters();
-  updateWelcomeGreeter(elapsed);
   checkCakeTrigger();
 
   renderer.render(scene, camera);

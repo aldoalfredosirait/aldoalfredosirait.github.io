@@ -160,6 +160,41 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 15) — Animasi "berjalan mendekat" warga penyapa DIHAPUS, langsung muncul di dekat mobil
+Permintaan user: warga penyapa (lanjutan 12-14) tidak perlu lagi berjalan
+mendekat — cukup langsung berada di dekat mobil dengan ucapannya begitu
+mobil dipindah ke luar monumen.
+
+**Disederhanakan** (SECTION 8B5): `triggerWelcomeGreeter()` sekarang
+langsung menempatkan orangnya di posisi tujuan (di pinggir jalan, offset
+8.5 unit dari mobil — rumus tidak berubah dari lanjutan 13/14) dan
+memaksa `sprite.visible = true` saat itu juga, tanpa fase "berjalan".
+Field `startX/startZ/walking/walkStartAt/joined` di objek
+`welcomeGreeter` dan `WELCOME_GREETER_WALK_DURATION` DIHAPUS (tidak lagi
+relevan). Dia langsung didorong ke `greeterList` di akhir
+`triggerWelcomeGreeter()` (bukan menunggu animasi selesai seperti
+sebelumnya) — sejak saat itu balonnya diatur `updateGreeters()` yang
+sama seperti 200 penyapa lain.
+
+**Konsekuensi**: karena kedatangannya sekarang instan, mekanisme
+`carMovementLocked` (lanjutan 14 — mengunci mobil sampai warga selesai
+menghampiri) jadi tidak berarti lagi (dikunci lalu langsung dibuka di
+pemanggilan yang sama, 0 durasi) — DIHAPUS SELURUHNYA supaya tidak jadi
+kode mati yang membingungkan pembaca kode di kemudian hari:
+`updatePhysics()` kembali ke `if (!unlocked) return;` saja, deklarasi
+`let carMovementLocked` dihapus, dan handler tombol `birthday-close`
+kembali memanggil `updateRouteHUD()` langsung (pesan "🎉 FINISH! Sekarang
+bebas jelajah" tampil seketika lagi, bukan ditunda). `repositionCarOutsideMonument()`
+TIDAK diubah — permintaan "mobil dipindah ke luar monumen" di lanjutan 14
+tetap dipertahankan persis seperti sebelumnya.
+
+**Verifikasi**: `node --check script.js` lolos, tidak ada sisa referensi
+ke `carMovementLocked`/`updateWelcomeGreeter`/`WELCOME_GREETER_WALK_DURATION`
+di kode aktif (dicek dgn grep, cuma tersisa di komentar historis
+penjelasan). Posisi mobil & warga dihitung ulang secara manual — warga
+muncul ~8.56 unit dari mobil (dalam radius trigger 9), konsisten dengan
+lanjutan 13/14.
+
 ### 2026-09-21 (lanjutan 14) — Setelah surat ditutup: mobil dipindah ke luar plaza monumen & dikunci total sampai warga sampai
 Permintaan user: setelah tombol tutup surat ditekan, posisi mobil
 dipindah ke luar monumen ulang tahun, lalu mobil tidak bisa bergerak
