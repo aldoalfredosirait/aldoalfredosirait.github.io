@@ -1933,9 +1933,10 @@ function buildWelcomeGreeter() {
 // datang. Arah pemindahan dihitung dari LANDMARK_CENTER ke posisi mobil
 // SAAT ITU (bukan arah tetap) — jadi mobil didorong keluar ke arah yang
 // sama dari mana dia datang, terasa natural, bukan lompat ke sisi
-// berlawanan. Mobil juga langsung dihadapkan BALIK ke arah monumen
-// supaya pemain masih melihat plaza & warga penyapa yang muncul di
-// sana.
+// berlawanan. Mobil dihadapkan KE DEPAN (searah dorongan keluar dari
+// monumen) — permintaan user, supaya begitu mobil bebas digerakkan dia
+// langsung siap jalan maju menjauhi plaza, bukan menghadap balik ke
+// monumen.
 function repositionCarOutsideMonument() {
   if (!landmarkCenter || !carGroup) return;
   const dx = carState.x - landmarkCenter.x;
@@ -1954,7 +1955,11 @@ function repositionCarOutsideMonument() {
   const OUTSIDE_R = LANDMARK_PLAZA_R + 3; // sedikit di luar tepi plaza (bukan pas di garis tepi)
   carState.x = landmarkCenter.x + dirX * OUTSIDE_R;
   carState.z = landmarkCenter.z + dirZ * OUTSIDE_R;
-  carState.heading = Math.atan2(-dirX, -dirZ); // menghadap balik ke arah monumen
+  // Menghadap KE DEPAN (permintaan user) — searah dengan dorongan keluar
+  // dari monumen (dirX/dirZ), BUKAN diputar balik ke monumen seperti
+  // versi sebelumnya. Mobil jadi langsung siap jalan maju menjauhi
+  // plaza begitu bebas digerakkan.
+  carState.heading = Math.atan2(dirX, dirZ);
   carState.speed = 0;
   carGroup.position.set(carState.x, 0, carState.z);
   carGroup.rotation.y = carState.heading;
@@ -1973,11 +1978,14 @@ function triggerWelcomeGreeter() {
   const dirX = Math.sin(carState.heading), dirZ = Math.cos(carState.heading);
   const sideX = -dirZ, sideZ = dirX; // tegak lurus arah mobil
 
-  // Offset SAMPING sengaja > separuh lebar jalan (TRACK_WIDTH/2 = 7)
-  // supaya orangnya berdiri di pinggir jalan/rumput, bukan di tengah
-  // jalur tempat mobil berada.
-  const targetX = carState.x + sideX * 8.5 + dirX * 1;
-  const targetZ = carState.z + sideZ * 8.5 + dirZ * 1;
+  // Jarak DIPERDEKAT (permintaan user, sebelumnya 8.5 unit ke samping —
+  // terasa terlalu jauh untuk dibilang "di dekat mobil"). Offset 4.2
+  // samping + 1.5 depan (jarak total ~4.5 unit dari mobil) sengaja masih
+  // dijaga di luar bodi mobil (body 2.6x4.2, setengah-diagonal ~2.47)
+  // dengan buffer ~2 unit supaya modelnya tidak saling tembus, tapi
+  // sudah terasa berdiri tepat di samping mobil, bukan agak jauh.
+  const targetX = carState.x + sideX * 4.2 + dirX * 1.5;
+  const targetZ = carState.z + sideZ * 4.2 + dirZ * 1.5;
 
   welcomeGreeter.group.position.set(targetX, 0, targetZ);
   welcomeGreeter.group.rotation.y = Math.atan2(carState.x - targetX, carState.z - targetZ); // menghadap ke arah mobil

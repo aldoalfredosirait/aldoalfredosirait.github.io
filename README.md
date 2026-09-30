@@ -160,6 +160,30 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 16) — Warga penyapa diperdekat ke mobil, mobil menghadap ke depan saat dipindah ke luar monumen
+Permintaan user: warga penyapa dibuat lebih dekat ke mobil, dan mobil
+menghadap ke depan (bukan balik ke monumen) saat dipindah keluar plaza.
+
+**Jarak warga diperdekat** (`triggerWelcomeGreeter()`, SECTION 8B5):
+offset posisi dari 8.5 unit ke samping + 1 unit ke depan (jarak ~8.56
+dari mobil) diperkecil jadi 4.2 unit ke samping + 1.5 unit ke depan
+(jarak ~4.46 dari mobil) — sekitar separuhnya, terasa benar-benar
+berdiri di samping mobil. Tetap dijaga di luar bodi mobil (2.6x4.2,
+setengah-diagonal ~2.47) dengan buffer ~2 unit supaya model tidak saling
+tembus. Masih di dalam GREETER_TRIGGER_RADIUS (9) seperti sebelumnya.
+
+**Mobil menghadap ke depan** (`repositionCarOutsideMonument()`): arah
+hadap mobil hasil reposisi diganti dari menghadap BALIK ke monumen jadi
+menghadap KE DEPAN — searah dengan arah dorongan keluar dari monumen
+(`dirX`/`dirZ`, vektor dari pusat monumen ke posisi mobil). Mobil jadi
+langsung siap jalan maju menjauhi plaza begitu bebas digerakkan, alih-
+alih harus diputar balik dulu oleh pemain.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang secara
+manual — arah hadap mobil memang persis sama dengan arah keluarnya dari
+pusat monumen, dan jarak warga ke mobil turun dari ~8.56 jadi ~4.46 unit
+dengan jarak aman ~1.99 unit dari bodi mobil (tidak tembus).
+
 ### 2026-09-21 (lanjutan 15) — Animasi "berjalan mendekat" warga penyapa DIHAPUS, langsung muncul di dekat mobil
 Permintaan user: warga penyapa (lanjutan 12-14) tidak perlu lagi berjalan
 mendekat — cukup langsung berada di dekat mobil dengan ucapannya begitu
