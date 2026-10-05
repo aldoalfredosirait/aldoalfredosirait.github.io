@@ -160,6 +160,42 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 17) — BUG FIX: foto dummy masih tampil padahal foto-*.jpg sudah diganti foto asli
+User melaporkan: foto asli (final) sudah ditaruh di `assets/photos/`, tapi
+saat dijalankan yang tampil di gapura foto masih foto dummy/placeholder
+lama.
+
+**Akar masalah**: PERSIS seperti yang sudah diperingatkan di
+`assets/photos/README.txt` (dan Log Keputusan Desain versi lebih lama,
+lihat bagian "foto diam-diam masih file lama" di bawah) — foto yang
+TAMPIL di gapura diambil dari `assets/photos-embedded.js` (base64 yang
+sudah di-*embed* duluan ke dalam file JS), BUKAN dibaca ulang dari
+`assets/photos/foto-*.jpg` setiap kali `index.html` dibuka. File
+`foto-*.jpg` sudah diganti foto asli (1600x508, ukuran pas sesuai
+rekomendasi), tapi `assets/photos-embedded.js` TIDAK ikut digenerate
+ulang — isinya masih base64 dari 10 foto placeholder lama (800x560,
+~31KB masing-masing, total file cuma ~430KB). Dicek & dibuktikan: setiap
+data URI di `assets/photos-embedded.js` didekode ulang satu per satu dan
+memang masih menghasilkan gambar 800x560, bukan 1600x508 seperti file
+jpg aslinya.
+
+**Perbaikan**: `assets/photos-embedded.js` digenerate ulang dari isi
+`assets/photos/foto-1.jpg` s/d `foto-10.jpg` yang SEKARANG (foto asli),
+persis pakai skrip Python Opsi 2 yang sudah didokumentasikan di
+`assets/photos/README.txt`. File berubah dari ~430KB jadi ~2.8MB (wajar
+— 10 foto asli ukuran lebih besar + base64 menggembungkan ~33%).
+
+**Verifikasi**: didekode ulang isi `assets/photos-embedded.js` yang baru
+— kesepuluh entrinya sekarang 1600x508, cocok dengan file jpg asli di
+`assets/photos/`. `node --check` pada `assets/photos-embedded.js` dan
+`script.js` lolos.
+
+**Supaya tidak terulang**: kalau mengganti foto lagi di masa depan, file
+`assets/photos/foto-*.jpg` HARUS diikuti salah satu dari dua langkah di
+`assets/photos/README.txt` (jalankan server lokal via Opsi 1, ATAU
+generate ulang `photos-embedded.js` via skrip Python di Opsi 2) — mengganti
+file jpg saja TIDAK CUKUP.
+
 ### 2026-09-21 (lanjutan 16) — Warga penyapa diperdekat ke mobil, mobil menghadap ke depan saat dipindah ke luar monumen
 Permintaan user: warga penyapa dibuat lebih dekat ke mobil, dan mobil
 menghadap ke depan (bukan balik ke monumen) saat dipindah keluar plaza.
