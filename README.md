@@ -160,6 +160,26 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 20) — Semua emoji dihapus dari 200 kalimat balon dialog
+Permintaan user: hilangkan emoji di setiap kalimat ucapan
+(`GREETER_MESSAGES`, SECTION 8B4).
+
+**Perubahan**: setiap kalimat di-scan karakter demi karakter — semua
+kode poin Unicode > U+2000 (mencakup seluruh emoji yang dipakai: simbol
+cuaca/alam seperti ☀️⛅🌈, emoji hati 💕💗💍, dkk — total 86 jenis emoji
+berbeda ditemukan dipakai di array ini) dibuang. Dicek lebih dulu bahwa
+TIDAK ADA kalimat yang punya teks SETELAH emoji terakhirnya (emoji
+semuanya nangkring di ujung kalimat, bukan di tengah) — jadi penghapusan
+aman tanpa merusak struktur kalimat. Spasi sisa di ujung kalimat (bekas
+sebelum emoji) dirapikan dengan `.rstrip()`, dan spasi ganda di tengah
+(kalau ada) dikompres jadi satu spasi.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang ke-200
+kalimat — tetap 200 unik, semua masih memuat "Gabriela", 0 kalimat yang
+masih menyisakan emoji atau spasi nyasar di ujung. 3 kalimat dirender di
+luar browser sebagai sampel — tampilan tetap rapi, malah lebih lega
+tanpa emoji di sudut balon.
+
 ### 2026-09-21 (lanjutan 19) — Kata "kita" diganti "kalian" di kalimat harapan hubungan (POV orang lain, bukan salah satu pasangan)
 Permintaan user: kalimat harapan hubungan pacaran (entri lanjutan 18)
 jangan memakai kata "kita" — ganti "kalian". Alasannya: balon dialog ini
