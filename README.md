@@ -160,6 +160,76 @@ cepat di tab browser. Lihat Log Keputusan Desain.
 
 ## Log Keputusan Desain
 
+### 2026-09-21 (lanjutan 19) — Kata "kita" diganti "kalian" di kalimat harapan hubungan (POV orang lain, bukan salah satu pasangan)
+Permintaan user: kalimat harapan hubungan pacaran (entri lanjutan 18)
+jangan memakai kata "kita" — ganti "kalian". Alasannya: balon dialog ini
+diucapkan oleh 200 warga kota yang BERBEDA-BEDA (bukan Aldo sendiri),
+jadi kalau memakai "kita" untuk merujuk ke hubungan/pasangan, itu secara
+tidak sengaja menyiratkan setiap NPC adalah salah satu pihak dalam
+hubungan tersebut. "Kalian" lebih tepat karena memposisikan si NPC
+sebagai ORANG LAIN yang mengucapkan harapan dari luar, bukan dari dalam
+hubungan itu sendiri.
+
+**Perubahan**: dari 18 kalimat "harapan hubungan pacaran" di lanjutan
+18, 15 di antaranya memakai "kita" merujuk ke hubungan/pasangan — semua
+diganti "kalian" dengan penyesuaian tata bahasa seperlunya (mis.
+"hubungan kita" -> "hubungan kalian", "kita bisa melewati" -> "kalian
+bisa melewati"). Satu kalimat lama dari batch "romantis/hangat"
+(lanjutan 4/8, bukan bagian dari 18 di atas tapi punya masalah serupa)
+juga ikut diperbaiki: "...cerita indah yang harus kita tulis bersama"
+-> "...harus kalian tulis bersama". Satu kalimat ("Semoga suatu hari
+nanti kita bisa merayakan ulang tahunmu bersama-sama") ditulis ulang
+lebih dari sekadar ganti kata, karena struktur aslinya ("kita merayakan
+ulang tahunmu") secara inheren mengandaikan si pembicara adalah bagian
+dari pasangan (tersirat situasi LDR) — diganti jadi "Semoga kalian
+selalu diberi kesempatan merayakan momen-momen berharga bersama,
+Gabriela" yang netral dari POV manapun.
+
+**TIDAK diubah** — 3 kalimat lain yang masih memakai "kita" tapi maknanya
+generik (bukan merujuk ke hubungan/pasangan): 2 dari adaptasi kutipan
+bijak ("Kita tidak bertambah tua..." & "Ulang tahun mengingatkan kita
+merayakan hidup...", "kita" = umat manusia secara umum) dan 1 kalimat
+ajakan umum dari warga ("...hari ini tetap kita rayakan sepuasnya!",
+"kita" = si NPC + Gabriela, bukan menyiratkan hubungan romantis).
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang ke-200
+kalimat — tetap 200 unik, semua masih memuat "Gabriela", tersisa cuma 3
+pemakaian "kita" (yang memang disengaja dipertahankan, generik). 2
+kalimat baru dirender di luar browser sebagai sampel — muat penuh, tidak
+terpotong.
+
+### 2026-09-21 (lanjutan 18) — Kalimat lelucon diganti kalimat harapan, kalimat pertemanan diganti harapan hubungan pacaran
+Permintaan user: di antara 200 kalimat balon dialog (`GREETER_MESSAGES`,
+SECTION 8B4), beberapa yang mengandung lelucon/jokes diganti jadi
+kalimat harapan, dan kalimat yang temanya pertemanan diganti jadi
+harapan hubungan pacaran.
+
+**24 kalimat lelucon -> kalimat harapan**: batch "Lucu" dari entri
+lanjutan 7 (nada bercanda — traktir, kolesterol, saldo ATM, diet,
+password, dst.) diganti kalimat harapan netral bertema syukur/doa untuk
+tahun ke depan (kesehatan, rezeki, ketenangan, pencapaian), nada serupa
+dengan batch "Doa" & "Semangat" yang sudah ada di array, tapi kalimat
+BARU (tidak menduplikasi yang sudah ada).
+
+**18 kalimat pertemanan -> harapan hubungan pacaran**: batch "Sahabat"
+dari entri lanjutan 7 (persahabatan, teman, sohib) diganti kalimat
+harapan tentang hubungan romantis — mis. "Semoga hubungan kita makin
+kuat dan makin dewasa...", "Semoga kita bisa terus saling mendukung
+mimpi satu sama lain...", "Semoga suatu hari nanti kita bisa merayakan
+ulang tahunmu bersama-sama...". Nadanya selaras dengan batch
+"romantis/hangat" yang sudah ada di bagian akhir array (dari sesi
+sebelumnya), bukan kontradiktif.
+
+Total 42 kalimat diganti lewat pencocokan string PERSIS satu-per-satu
+(bukan tebak pola) — 24 + 18 = 42, semuanya berhasil cocok & terganti
+tanpa ada yang terlewat/salah sasaran.
+
+**Verifikasi**: `node --check script.js` lolos; dihitung ulang ke-200
+kalimat — tetap 200 unik, semua masih memuat "Gabriela", panjang
+61-119 karakter (masih dalam rentang yang sudah terbukti muat di balon
+dialog). 4 kalimat baru dirender di luar browser sebagai sampel — semua
+muat penuh, tidak terpotong.
+
 ### 2026-09-21 (lanjutan 17) — BUG FIX: foto dummy masih tampil padahal foto-*.jpg sudah diganti foto asli
 User melaporkan: foto asli (final) sudah ditaruh di `assets/photos/`, tapi
 saat dijalankan yang tampil di gapura foto masih foto dummy/placeholder
